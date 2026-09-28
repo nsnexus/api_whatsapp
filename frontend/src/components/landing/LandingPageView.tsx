@@ -245,11 +245,11 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           {/* Logo 3D Oficial */}
           <a href="#" className="flex items-center gap-3 group">
-            <div className="relative w-11 h-11 rounded-2xl overflow-hidden shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+            <div className="relative h-11 flex items-center group-hover:scale-105 transition-transform">
               <img
                 src="/logo.png"
                 alt="NexusAPI Logo"
-                className="w-full h-full object-cover"
+                className="h-10 w-auto object-contain drop-shadow-[0_4px_12px_rgba(16,185,129,0.25)]"
               />
             </div>
             <div className="flex flex-col">
@@ -273,7 +273,15 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               <a
                 key={link.href}
                 href={link.href}
-                className="hover:text-emerald-400 transition-colors py-1"
+                onClick={(e) => {
+                  e.preventDefault();
+                  const el = document.querySelector(link.href);
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth' });
+                    window.history.pushState(null, '', link.href);
+                  }
+                }}
+                className="hover:text-emerald-400 transition-colors py-1 cursor-pointer"
               >
                 {link.label}
               </a>
@@ -326,7 +334,15 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               <a
                 key={link.href}
                 href={link.href}
-                onClick={() => setMobileMenuOpen(false)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setMobileMenuOpen(false);
+                  const el = document.querySelector(link.href);
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth' });
+                    window.history.pushState(null, '', link.href);
+                  }
+                }}
                 className="block py-2 text-sm font-semibold text-slate-300 hover:text-emerald-400"
               >
                 {link.label}
@@ -895,7 +911,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
       <footer className="py-12 border-t border-slate-800/80 bg-[#060911] text-xs text-slate-400 relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="NexusAPI" className="w-8 h-8 rounded-xl object-cover" />
+            <img src="/logo.png" alt="NexusAPI" className="h-8 w-auto object-contain" />
             <div>
               <p className="font-bold text-white text-sm">NexusAPI</p>
               <p className="text-[11px] text-slate-500">API Profissional de WhatsApp para Automações</p>

@@ -1258,16 +1258,40 @@ Pode usar qualquer linguagem, mas prefiro [COLOQUE SUA LINGUAGEM AQUI].`;
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#0a0d14] text-slate-100 overflow-hidden font-sans">
-      {/* 1. Header Global da Documentação (Idêntico ao docs.w-api.app) */}
-      <header className="h-14 border-b border-slate-800/80 bg-[#0e131f]/90 backdrop-blur-xl px-4 sm:px-6 flex items-center justify-between z-40 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-emerald-500 to-emerald-400 flex items-center justify-center text-slate-950 font-black text-sm shadow-md shadow-emerald-500/20">
-              N
+      {/* 1. Header Global da Documentação */}
+      <header className="h-16 border-b border-slate-800/80 bg-[#0e131f]/95 backdrop-blur-xl px-4 sm:px-6 flex items-center justify-between z-40 flex-shrink-0">
+        <div className="flex items-center gap-3 sm:gap-5">
+          {/* Botão de Voltar para a Landing Page */}
+          <button
+            type="button"
+            onClick={() => onNavigateTab ? onNavigateTab('landing') : (window.location.href = '/')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 bg-slate-900/80 hover:bg-slate-800 text-xs font-semibold text-slate-300 hover:text-emerald-400 transition-all group"
+            title="Voltar para a página inicial"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+            <span className="hidden sm:inline">Voltar ao Início</span>
+          </button>
+
+          <div className="h-6 w-px bg-slate-800/80 hidden sm:block" />
+
+          {/* Logo 3D Oficial e Título */}
+          <div 
+            onClick={() => onNavigateTab ? onNavigateTab('landing') : (window.location.href = '/')}
+            className="flex items-center gap-3 cursor-pointer group"
+            title="NexusAPI - Início"
+          >
+            <div className="h-9 w-auto flex items-center">
+              <img 
+                src="/logo.png" 
+                alt="Nexus API Logo" 
+                className="h-8 sm:h-9 w-auto object-contain transition-transform group-hover:scale-105 drop-shadow-[0_2px_8px_rgba(16,185,129,0.3)]" 
+              />
             </div>
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-base text-white tracking-tight">Nexus API</span>
-              <span className="text-[11px] font-bold text-slate-400 border-l border-slate-800 pl-2.5 py-0.5">
+              <span className="font-extrabold text-base text-white tracking-tight group-hover:text-emerald-400 transition-colors">
+                Nexus<span className="text-emerald-400">API</span>
+              </span>
+              <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
                 Documentação
               </span>
             </div>

@@ -389,18 +389,19 @@ export const App: React.FC = () => {
     }
 
     const handleHashChange = () => {
-      if (window.location.hash === '#landing') {
+      const hash = window.location.hash;
+      if (hash === '#landing' || !hash || hash === '#') {
         setCurrentTab('landing');
-      } else if (window.location.hash === '#app') {
+      } else if (hash === '#app') {
         setCurrentTab('chat');
-      } else if (window.location.hash === '#docs') {
+      } else if (hash === '#docs') {
         setCurrentTab('docs');
-      } else if (window.location.hash === '#admin') {
+      } else if (hash === '#admin') {
         setCurrentTab('admin');
-      } else if (window.location.hash === '#login') {
+      } else if (hash === '#login') {
         setAuthModalMode('login');
         setIsAuthModalOpen(true);
-      } else if (window.location.hash === '#cadastro') {
+      } else if (hash === '#cadastro') {
         setAuthModalMode('register');
         setIsAuthModalOpen(true);
       }
@@ -735,7 +736,10 @@ export const App: React.FC = () => {
             setIsAuthModalOpen(true);
           }}
           onEnterApp={enterApp}
-          onOpenDocs={() => setCurrentTab('docs')}
+          onOpenDocs={() => {
+            window.history.pushState(null, '', '#docs');
+            setCurrentTab('docs');
+          }}
         />
         <AuthModal
           isOpen={isAuthModalOpen}
@@ -755,9 +759,10 @@ export const App: React.FC = () => {
           instances={instances} 
           onNavigateTab={(tab) => {
             if (tab === 'landing') {
-              selectTab(tab);
+              window.history.pushState(null, '', window.location.pathname);
+              selectTab('landing');
             } else {
-              window.history.replaceState(null, '', '#app');
+              window.history.pushState(null, '', '#app');
               setCurrentTab(tab);
             }
           }}
