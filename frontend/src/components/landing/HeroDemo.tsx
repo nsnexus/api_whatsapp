@@ -284,7 +284,7 @@ export const HeroDemo: React.FC = () => {
     <div className="w-full max-w-6xl mx-auto rounded-3xl bg-[#0f1424]/90 border border-slate-800 shadow-2xl overflow-hidden backdrop-blur-xl transition-all">
       {/* Barra de Controles de Endpoints do Topo */}
       <div className="p-4 sm:p-5 border-b border-slate-800/80 bg-[#141b2e]/60 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none w-full sm:w-auto">
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none no-scrollbar w-full sm:w-auto py-1">
           {ENDPOINTS.map((ep, idx) => (
             <button
               key={ep.id}

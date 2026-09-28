@@ -775,8 +775,8 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                   }`}
                 >
                   {isPopular && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                      <span className="px-4 py-1 rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-black text-[11px] uppercase tracking-wider shadow-lg">
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-20">
+                      <span className="inline-flex items-center px-4 py-1 rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-black text-[11px] uppercase tracking-wider shadow-lg shadow-emerald-500/20 whitespace-nowrap">
                         {p.badge}
                       </span>
                     </div>
