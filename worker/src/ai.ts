@@ -302,6 +302,21 @@ SEU OBJETIVO NESTE PRIMEIRO CONTATO:
 
   // 7. Chamada à API da OpenAI (ChatGPT)
   const modelToUse = aiSettings.openai_model || 'gpt-5.6-luna';
+  const isReasoningModel =
+    modelToUse.includes('gpt-5') ||
+    modelToUse.includes('o1') ||
+    modelToUse.includes('o3');
+
+  const requestPayload: Record<string, any> = {
+    model: modelToUse,
+    messages: openAiMessages,
+    max_completion_tokens: 650,
+  };
+
+  // Modelos clássicos (GPT-4o, GPT-4o-mini) aceitam temperature; modelos de raciocínio (GPT-5.6, o1, o3) gerenciam internamente
+  if (!isReasoningModel) {
+    requestPayload.temperature = 0.7;
+  }
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -310,12 +325,7 @@ SEU OBJETIVO NESTE PRIMEIRO CONTATO:
         'Content-Type': 'application/json',
         Authorization: `Bearer ${aiSettings.openai_api_key}`,
       },
-      body: JSON.stringify({
-        model: modelToUse,
-        messages: openAiMessages,
-        temperature: 0.7,
-        max_completion_tokens: 650,
-      }),
+      body: JSON.stringify(requestPayload),
     });
 
     if (!response.ok) {
