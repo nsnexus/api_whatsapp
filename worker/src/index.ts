@@ -480,7 +480,7 @@ export default {
             body: JSON.stringify({
               model: body.model || 'gpt-5.6-luna',
               messages: [{ role: 'user', content: 'Teste de conexão rápido. Responda apenas: OK' }],
-              max_completion_tokens: 10,
+              max_completion_tokens: 100,
             }),
           });
 
