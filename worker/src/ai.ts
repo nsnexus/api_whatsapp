@@ -22,6 +22,18 @@ export interface FaqObjection {
   reply_guide: string;
 }
 
+export interface FlowStep {
+  id: string;
+  type: 'text' | 'image' | 'audio' | 'video' | 'wait_reply' | 'generate_pix' | 'deliver_materials' | 'deliver_bonus';
+  title: string;
+  content?: string;
+  caption?: string;
+  delay_seconds?: number;
+  wait_condition?: string;
+  media_name?: string;
+  material_ids?: string[];
+}
+
 export interface Course {
   id: string;
   organization_id: string;
@@ -39,6 +51,7 @@ export interface Course {
   materials: MaterialItem[];
   bonuses: BonusItem[];
   faq_objections: FaqObjection[];
+  flow_steps?: FlowStep[];
   is_active: boolean;
 }
 
@@ -137,13 +150,28 @@ export async function generateCourseAiReply(params: {
     .eq('organization_id', organizationId)
     .eq('is_active', true);
 
-  const courses: Course[] = (coursesData || []).map((c: any) => ({
-    ...c,
-    materials: Array.isArray(c.materials) ? c.materials : [],
-    bonuses: Array.isArray(c.bonuses) ? c.bonuses : [],
-    faq_objections: Array.isArray(c.faq_objections) ? c.faq_objections : [],
-    triggers: Array.isArray(c.triggers) ? c.triggers : [],
-  }));
+  const courses: Course[] = (coursesData || []).map((c: any) => {
+    let steps: FlowStep[] = [];
+    if (Array.isArray(c.flow_steps)) {
+      steps = c.flow_steps;
+    } else if (c.ai_persona) {
+      const match = c.ai_persona.match(/<!--FLOW_STEPS:(.*?)-->/s);
+      if (match) {
+        try {
+          steps = JSON.parse(match[1]);
+        } catch {}
+      }
+    }
+
+    return {
+      ...c,
+      materials: Array.isArray(c.materials) ? c.materials : [],
+      bonuses: Array.isArray(c.bonuses) ? c.bonuses : [],
+      faq_objections: Array.isArray(c.faq_objections) ? c.faq_objections : [],
+      triggers: Array.isArray(c.triggers) ? c.triggers : [],
+      flow_steps: steps,
+    };
+  });
 
   if (courses.length === 0) {
     console.log('Nenhum curso ativo cadastrado.');
@@ -317,6 +345,31 @@ export async function generateCourseAiReply(params: {
             .join('\n')
         : '';
 
+    const customFlowStr = (activeCourse.flow_steps && activeCourse.flow_steps.length > 0)
+      ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ROTEIRO EXATO DO FLUXO PROGRAMADO PARA ESTE CURSO (SIGA ESTA SEQUÊNCIA DE AÇÕES):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${activeCourse.flow_steps.map((s, idx) => {
+  const num = idx + 1;
+  if (s.type === 'image') return `Ação ${num}: [ENVIAR FOTO/IMAGEM] ${s.title}${s.caption ? ` (Legenda: "${s.caption}")` : ''}${s.content ? ` URL: ${s.content}` : ''}`;
+  if (s.type === 'text') return `Ação ${num}: [ENVIAR TEXTO] "${s.content || s.title}"`;
+  if (s.type === 'audio') return `Ação ${num}: [ENVIAR ÁUDIO PTT] ${s.title}`;
+  if (s.type === 'video') return `Ação ${num}: [ENVIAR VÍDEO] ${s.title}${s.caption ? ` (Legenda: "${s.caption}")` : ''}`;
+  if (s.type === 'wait_reply') return `Ação ${num}: [AGUARDAR CLIENTE] O robô pausa e aguarda resposta: ${s.wait_condition || 'Confirmação do cliente'}`;
+  if (s.type === 'generate_pix') return `Ação ${num}: [GERAR PIX] Disparar dados e código Copia e Cola do PIX de R$ ${Number(activeCourse.price).toFixed(2)} (tag: [GERAR_PIX])`;
+  if (s.type === 'deliver_materials') return `Ação ${num}: [ENTREGAR MATERIAIS] Disparar os arquivos do curso (tag: [ENTREGAR_CURSO])`;
+  if (s.type === 'deliver_bonus') return `Ação ${num}: [LIBERAR BÔNUS] Disparar os bônus prometidos (tag: [LIBERAR_BONUS])`;
+  return `Ação ${num}: ${s.title}`;
+}).join('\n')}
+
+DIRETRIZES DO FLUXO:
+- Siga com prioridade a ordem das Ações programadas acima.
+- Quando chegar em [AGUARDAR CLIENTE], finalize a mensagem e espere a confirmação do cliente antes de disparar o próximo passo.
+- Se o cliente perguntar algo fora do script (dúvidas práticas, objeções), responda com clareza e em seguida retome o próximo passo do fluxo programado.
+`
+      : '';
+
     systemPrompt = `
 🚨 REGRA NÚMERO 1 ABSOLUTA (LEIA ANTES DE TUDO):
 Analise com rigor extremo a intenção da mensagem do cliente:
@@ -344,9 +397,10 @@ ${bonusesStr}
 
 QUEBRA DE OBJEÇÕES:
 ${objectionsStr}
+${customFlowStr}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ESTRATÉGIA DO FUNIL DE ALTA CONVERSÃO EM 3 ETAPAS (SIGA COM RIGOR ABSOLUTO):
+ESTRATÉGIA DO FUNIL DE ALTA CONVERSÃO EM 3 ETAPAS (REFERÊNCIA DE FECHAMENTO):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📌 ETAPA 1: APRESENTAÇÃO + PROPOSTA DO VOTO DE CONFIANÇA

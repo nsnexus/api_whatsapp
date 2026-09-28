@@ -105,7 +105,7 @@ export const CourseModal: React.FC<CourseModalProps> = ({
       setOriginalPrice(course.original_price ? String(course.original_price) : '');
       setTriggers(course.triggers || []);
       setIsActive(course.is_active ?? true);
-      setAiPersona(course.ai_persona || '');
+      setAiPersona(course.ai_persona ? course.ai_persona.replace(/<!--FLOW_STEPS:.*?-->/gs, '').trim() : '');
       setMaterials(course.materials || []);
       setBonuses(course.bonuses || []);
       setFaqObjections(course.faq_objections || []);
@@ -406,7 +406,10 @@ export const CourseModal: React.FC<CourseModalProps> = ({
         original_price: originalPrice ? Number(originalPrice) : undefined,
         triggers,
         is_active: isActive,
-        ai_persona: aiPersona.trim(),
+        ai_persona: (() => {
+          const matchFlow = course?.ai_persona ? course.ai_persona.match(/<!--FLOW_STEPS:.*?-->/s) : null;
+          return matchFlow ? `${aiPersona.trim()}\n\n${matchFlow[0]}` : aiPersona.trim();
+        })(),
         materials,
         bonuses,
         faq_objections: faqObjections,

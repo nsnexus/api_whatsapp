@@ -258,7 +258,7 @@ export const CoursesBotsView: React.FC<CoursesBotsViewProps> = ({
             }`}
           >
             <Workflow className="w-4 h-4" />
-            <span>Fluxograma do Funil (3 Etapas)</span>
+            <span>Construtor de Fluxo (Flow Builder)</span>
           </button>
 
           <button
@@ -489,6 +489,7 @@ export const CoursesBotsView: React.FC<CoursesBotsViewProps> = ({
           <FunnelFlowView
             courses={courses}
             onOpenSimulator={() => setActiveTab('playground')}
+            onSaveCourse={handleSaveCourse}
           />
         )}
 

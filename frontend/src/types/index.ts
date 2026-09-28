@@ -141,6 +141,28 @@ export interface FaqObjection {
   reply_guide: string;
 }
 
+export type FlowStepType = 
+  | 'text' 
+  | 'image' 
+  | 'audio' 
+  | 'video' 
+  | 'wait_reply' 
+  | 'generate_pix' 
+  | 'deliver_materials' 
+  | 'deliver_bonus';
+
+export interface FlowStep {
+  id: string;
+  type: FlowStepType;
+  title: string;
+  content?: string;
+  caption?: string;
+  delay_seconds?: number;
+  wait_condition?: string;
+  media_name?: string;
+  material_ids?: string[];
+}
+
 export interface Course {
   id: string;
   organization_id: string;
@@ -158,6 +180,7 @@ export interface Course {
   materials: MaterialItem[];
   bonuses: BonusItem[];
   faq_objections: FaqObjection[];
+  flow_steps?: FlowStep[];
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
