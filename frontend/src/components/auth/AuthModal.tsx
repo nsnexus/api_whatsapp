@@ -156,9 +156,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <div className="p-6 md:p-8 space-y-6">
           {/* Topo / Logo */}
           <div className="text-center space-y-2">
-            <div className="inline-flex w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-emerald-400 items-center justify-center text-slate-950 font-black text-2xl shadow-lg shadow-emerald-500/20 mb-1">
-              N
-            </div>
+            <img
+              src="/logo.png"
+              alt="NexusAPI"
+              className="w-14 h-14 object-contain mx-auto drop-shadow-[0_0_15px_rgba(16,185,129,0.35)] mb-1"
+            />
             <h3 className="text-xl font-bold text-white tracking-tight">
               {mode === 'register' ? 'Criar sua Conta Grátis' : 'Bem-vindo de Volta'}
             </h3>

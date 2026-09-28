@@ -124,10 +124,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <aside className="w-64 bg-[#0e131f] border-r border-slate-800/80 flex flex-col justify-between h-screen select-none transition-all flex-shrink-0">
       {/* Top: Logo Nexus API */}
       <div className="overflow-y-auto">
-        <div className="h-20 flex items-center px-6 border-b border-slate-800/80 gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-emerald-400 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg shadow-emerald-500/20 flex-shrink-0">
-            N
-          </div>
+        <div className="h-20 flex items-center px-5 border-b border-slate-800/80 gap-3">
+          <img
+            src="/logo.png"
+            alt="NexusAPI"
+            className="w-10 h-10 object-contain rounded-xl shadow-lg shadow-emerald-500/20 flex-shrink-0"
+          />
           <div>
             <h1 className="font-bold text-lg text-white tracking-tight flex items-center gap-1.5">
               Nexus API
