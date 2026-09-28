@@ -1,0 +1,15 @@
+# Dependências e builds
+node_modules/
+dist/
+.wrangler/
+.claude/
+*.tsbuildinfo
+.temp/
+
+# Arquivos de credenciais locais e senhas
+VPS_CREDENCIAIS.txt
+scratch/
+*.local
+.env
+.env.*
+!.env.example

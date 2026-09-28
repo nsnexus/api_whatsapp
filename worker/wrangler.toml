@@ -1,0 +1,19 @@
+name = "crm-evolution-worker"
+main = "src/index.ts"
+compatibility_date = "2024-09-01"
+
+# Bucket R2 para armazenar áudios, imagens e anexos do WhatsApp com tráfego gratuito
+[[r2_buckets]]
+binding = "CRM_MEDIA_BUCKET"
+bucket_name = "crm-media"
+
+[vars]
+EVOLUTION_GO_URL = "https://evolution.nsnexus.com.br"
+EVOLUTION_GO_API_KEY = "evol_go_sec_crm_987654321_token"
+
+# Supabase URL e Chave de Serviço (Service Role para gravar webhooks com permissão de sistema)
+SUPABASE_URL = "https://omqijqtwhakmktaqdbsw.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9tcWlqcXR3aGFrbWt0YXFkYnN3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDIwODY1NCwiZXhwIjoyMTA1Nzg0NjU0fQ.dIHLIP_EyOuHSDYeiHXgZeqoDmbnEkQnk7Kb1lGoyTc"
+
+# URL pública para servir mídias do bucket R2 (configurado no Cloudflare R2 custom domain)
+R2_PUBLIC_URL = "https://media.seucrm.com.br"

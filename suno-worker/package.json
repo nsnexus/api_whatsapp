@@ -1,0 +1,9 @@
+{
+  "name": "suno-api-worker",
+  "version": "1.0.0",
+  "description": "API Serverless do Suno v6 no Cloudflare Workers",
+  "main": "src/index.ts",
+  "scripts": {
+    "deploy": "wrangler deploy"
+  }
+}
