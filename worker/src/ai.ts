@@ -181,6 +181,27 @@ export async function generateCourseAiReply(params: {
     activeCourse = courses.find((c) => c.id === chat.active_course_id);
   }
 
+  // D. Se ainda não achou, buscar pelo histórico recente de mensagens
+  if (!activeCourse && historyMessages.length > 0) {
+    for (let i = historyMessages.length - 1; i >= 0; i--) {
+      const cleanH = cleanTextForMatching(historyMessages[i].content);
+      const found = courses.find(
+        (c) =>
+          cleanH.includes(cleanTextForMatching(c.name)) ||
+          c.triggers.some((tr) => cleanH.includes(cleanTextForMatching(tr)))
+      );
+      if (found) {
+        activeCourse = found;
+        break;
+      }
+    }
+  }
+
+  // Se ainda assim não achou e houver apenas 1 curso ativo na conta, utilizar ele
+  if (!activeCourse && courses.length === 1) {
+    activeCourse = courses[0];
+  }
+
   // Atualizar no banco o curso ativo da conversa se houver mudança
   if (activeCourse && chat && chat.active_course_id !== activeCourse.id) {
     await supabase.from('chats').update({ active_course_id: activeCourse.id }).eq('id', chatId);
