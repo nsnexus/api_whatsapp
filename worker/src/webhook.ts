@@ -316,7 +316,7 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
             historyMessages,
           });
 
-          if (aiResult && aiResult.replyText) {
+          if (aiResult && !aiResult.ignored && aiResult.replyText && aiResult.replyText.trim()) {
             const evolution = new EvolutionGoClient(env);
 
             // 1. Enviar mensagem de texto no WhatsApp do cliente
@@ -418,6 +418,8 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
               content: aiResult.replyText,
               status: 'sent',
             });
+          } else if (aiResult?.ignored) {
+            console.log(`[AI Bot] Mensagem de ${cleanPhone} desconsiderada: não referente a cursos.`);
           }
         } catch (aiErr) {
           console.error('Erro ao processar resposta do Bot de Cursos IA:', aiErr);

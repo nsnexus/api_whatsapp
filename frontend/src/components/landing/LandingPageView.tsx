@@ -842,10 +842,10 @@ print(response.json())`;
       {/* Modal de Checkout */}
       {selectedPlan && (
         <CheckoutModal
-          plan={selectedPlan}
           isOpen={Boolean(selectedPlan)}
+          selectedPlan={selectedPlan.name}
           onClose={() => setSelectedPlan(null)}
-          onSuccess={() => {
+          onPaymentSuccess={() => {
             setSelectedPlan(null);
             onOpenAuth('register');
           }}

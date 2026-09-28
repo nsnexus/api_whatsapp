@@ -15,7 +15,8 @@ import {
   Check, 
   Play,
   HelpCircle,
-  Zap
+  Zap,
+  PackageCheck
 } from 'lucide-react';
 import { Course } from '../../types';
 
@@ -100,9 +101,9 @@ export const FunnelFlowView: React.FC<FunnelFlowViewProps> = ({ courses, onOpenS
                 Etapa 1
               </span>
               <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
-                <Mic className="w-3.5 h-3.5 text-teal-400" title="Suporta Áudio PTT" />
-                <Video className="w-3.5 h-3.5 text-blue-400" title="Suporta Vídeo" />
-                <ImageIcon className="w-3.5 h-3.5 text-purple-400" title="Suporta Imagem" />
+                <span title="Suporta Áudio PTT"><Mic className="w-3.5 h-3.5 text-teal-400" /></span>
+                <span title="Suporta Vídeo"><Video className="w-3.5 h-3.5 text-blue-400" /></span>
+                <span title="Suporta Imagem"><ImageIcon className="w-3.5 h-3.5 text-purple-400" /></span>
               </div>
             </div>
 

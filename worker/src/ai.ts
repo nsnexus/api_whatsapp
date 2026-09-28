@@ -62,6 +62,7 @@ export interface AiReplyResult {
   actions: AiAction[];
   courseId?: string;
   courseName?: string;
+  ignored?: boolean;
 }
 
 /**
@@ -299,6 +300,15 @@ REGRAS GERAIS DE CONVERSAÇÃO NO WHATSAPP:
 - NUNCA diga que você é um robô, IA da OpenAI ou ChatGPT. Você é o consultor oficial do curso.
 - Se o cliente tiver dúvidas sobre o curso, tire as dúvidas com clareza e volte para a pergunta da etapa correspondente.
 - Se o cliente solicitar atendimento humano explicitamente, use a tag [CHAMAR_HUMANO].
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 REGRA CRÍTICA DE FILTRO (DESCONSIDERAR ASSUNTOS NÃO REFERENTES A CURSOS):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Você só deve responder se a mensagem tiver relação com o curso "${activeCourse.name}", com nossos treinamentos, materiais, dúvidas do conteúdo ou se for parte do diálogo de negociação em andamento (ex: "sim", "pode mandar", "já fiz o pix", etc.).
+
+SE A MENSAGEM DO CLIENTE NÃO FOR SOBRE O CURSO (ex: conversas pessoais, familiares, cobranças externas de terceiros, propaganda de outros produtos, piadas, engano de número, spam ou assuntos fora de contexto):
+👉 Responda EXATAMENTE E APENAS COM A PALAVRA: [IGNORAR]
+NÃO cumprimente, NÃO tente vender, NÃO peça desculpas e NÃO diga que é uma IA. Apenas responda: [IGNORAR]
 `.trim();
   } else {
     // 5.2 Prompt GERAL - Cliente ainda não escolheu um curso
@@ -321,6 +331,11 @@ SEU OBJETIVO NESTE PRIMEIRO CONTATO:
 2. Informe brevemente que temos excelentes cursos práticos com acesso imediato e valores acessíveis.
 3. Pergunte em qual área ou curso ele tem mais interesse em aprender ou evoluir no momento.
 4. Mantenha a resposta concisa (máximo 2 a 3 parágrafos curtos) para facilitar a leitura no WhatsApp.
+
+🚨 REGRA CRÍTICA DE FILTRO:
+Se a mensagem recebida NÃO tiver relação com cursos, treinamentos, estudos ou não demonstrar interesse em aprender (ex: conversas pessoais, engano de número, cobranças externas, spam, outros serviços não relacionados):
+👉 Responda EXATAMENTE E APENAS com a palavra: [IGNORAR]
+NÃO envie o catálogo e NÃO responda nada além de: [IGNORAR]
 `.trim();
   }
 
@@ -376,6 +391,18 @@ SEU OBJETIVO NESTE PRIMEIRO CONTATO:
 
     if (!rawReply.trim()) {
       return null;
+    }
+
+    // 7.1 Se a IA identificou que a mensagem não é referente a cursos, desconsiderar
+    if (rawReply.includes('[IGNORAR]')) {
+      console.log('Mensagem desconsiderada pela IA (assunto fora do escopo de cursos).');
+      return {
+        replyText: '',
+        actions: [],
+        ignored: true,
+        courseId: activeCourse?.id,
+        courseName: activeCourse?.name,
+      };
     }
 
     const actions: AiAction[] = [];

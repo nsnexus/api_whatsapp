@@ -534,6 +534,15 @@ export default {
           );
         }
 
+        if (simResult.ignored) {
+          return jsonResponse({
+            replyText: '🚫 [Mensagem desconsiderada pelo Robô - O assunto não é referente a cursos]',
+            actions: [],
+            ignored: true,
+            courseName: simResult.courseName,
+          });
+        }
+
         return jsonResponse(simResult);
       }
 
