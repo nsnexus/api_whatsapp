@@ -4,6 +4,59 @@ import { resolveChatJid, extractMessageContent, timestampToIso } from './whatsap
 import { EvolutionGoClient } from './evolution';
 import { generateCourseAiReply } from './ai';
 
+async function sendEvolutionMedia(
+  evolution: EvolutionGoClient,
+  instanceName: string,
+  cleanPhone: string,
+  mat: { name?: string; url: string; type?: string }
+) {
+  const urlLower = String(mat.url).toLowerCase();
+  const isAudio =
+    mat.type === 'audio' ||
+    urlLower.endsWith('.mp3') ||
+    urlLower.endsWith('.m4a') ||
+    urlLower.endsWith('.ogg') ||
+    urlLower.endsWith('.wav');
+  const isVideo =
+    mat.type === 'video' ||
+    urlLower.endsWith('.mp4') ||
+    urlLower.endsWith('.mov') ||
+    urlLower.endsWith('.webm');
+  const isImage =
+    mat.type === 'image' ||
+    urlLower.endsWith('.png') ||
+    urlLower.endsWith('.jpg') ||
+    urlLower.endsWith('.jpeg') ||
+    urlLower.endsWith('.webp');
+
+  if (isAudio) {
+    await evolution.sendWhatsAppAudio(instanceName, {
+      number: cleanPhone,
+      audio: mat.url,
+    });
+  } else {
+    const mediaType: 'image' | 'video' | 'document' = isImage
+      ? 'image'
+      : isVideo
+      ? 'video'
+      : 'document';
+    const ext = isImage ? 'png' : isVideo ? 'mp4' : 'pdf';
+    const cleanFileName = mat.name
+      ? `${mat.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.${ext}`
+      : `material.${ext}`;
+
+    await evolution.sendMedia(instanceName, {
+      number: cleanPhone,
+      mediaMessage: {
+        mediatype: mediaType,
+        media: mat.url,
+        fileName: cleanFileName,
+        caption: mat.name ? `📚 *${mat.name}*` : undefined,
+      },
+    });
+  }
+}
+
 export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, env: Env): Promise<Response> {
   const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
@@ -221,6 +274,35 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
         })
         .eq('id', chat.id);
 
+      // 4.3 Salvar mensagem recebida no banco para histórico do chat e contexto da IA
+      await supabase.from('messages').insert({
+        organization_id: organizationId,
+        chat_id: chat.id,
+        instance_id: instanceId,
+        direction: 'inbound',
+        sender_type: 'contact',
+        type: extracted.type || 'text',
+        content: extracted.text,
+        status: 'received',
+      });
+
+      // 4.4 Buscar histórico recente de mensagens desta conversa para o robô ter memória de contexto
+      const { data: dbHistory } = await supabase
+        .from('messages')
+        .select('direction, content')
+        .eq('chat_id', chat.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      const historyMessages = (dbHistory || [])
+        .reverse()
+        .slice(0, -1) // remove a última inserida (que já é incomingText)
+        .filter((m) => m.content && m.content.trim())
+        .map((m) => ({
+          role: m.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
+          content: m.content || '',
+        }));
+
       // Disparar o Atendente de Vendas IA (OpenAI ChatGPT)
       if (extracted.text && extracted.type === 'text') {
         try {
@@ -231,6 +313,7 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
             incomingText: extracted.text,
             customerName: contact.name || contact.push_name || undefined,
             customerPhone: cleanPhone,
+            historyMessages,
           });
 
           if (aiResult && aiResult.replyText) {
@@ -242,59 +325,81 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
               text: aiResult.replyText,
             });
 
-            // 2. Se a IA acionou o envio de material/amostra [ENVIAR_MATERIAL: ...]
-            for (const action of aiResult.actions) {
-              if (action.type === 'send_media' && action.payload?.url) {
-                const mat = action.payload;
-                const urlLower = String(mat.url).toLowerCase();
-                const isAudio =
-                  mat.type === 'audio' ||
-                  urlLower.endsWith('.mp3') ||
-                  urlLower.endsWith('.m4a') ||
-                  urlLower.endsWith('.ogg') ||
-                  urlLower.endsWith('.wav');
-                const isVideo =
-                  mat.type === 'video' ||
-                  urlLower.endsWith('.mp4') ||
-                  urlLower.endsWith('.mov') ||
-                  urlLower.endsWith('.webm');
-                const isImage =
-                  mat.type === 'image' ||
-                  urlLower.endsWith('.png') ||
-                  urlLower.endsWith('.jpg') ||
-                  urlLower.endsWith('.jpeg') ||
-                  urlLower.endsWith('.webp');
-
-                if (isAudio) {
-                  await evolution.sendWhatsAppAudio(instanceName, {
-                    number: cleanPhone,
-                    audio: mat.url,
-                  });
-                } else {
-                  const mediaType: 'image' | 'video' | 'document' = isImage
-                    ? 'image'
-                    : isVideo
-                    ? 'video'
-                    : 'document';
-                  const ext = isImage ? 'png' : isVideo ? 'mp4' : 'pdf';
-                  const cleanFileName = mat.name
-                    ? `${mat.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.${ext}`
-                    : `amostra.${ext}`;
-
-                  await evolution.sendMedia(instanceName, {
-                    number: cleanPhone,
-                    mediaMessage: {
-                      mediatype: mediaType,
-                      media: mat.url,
-                      fileName: cleanFileName,
-                      caption: `📚 *${mat.name}*`,
-                    },
-                  });
+            // 2. Se a IA acionou a entrega de todos os materiais do curso [ENTREGAR_CURSO]
+            const deliverMaterialsAction = aiResult.actions.find(
+              (a) => a.type === 'deliver_course_materials'
+            );
+            if (deliverMaterialsAction && Array.isArray(deliverMaterialsAction.payload)) {
+              for (const mat of deliverMaterialsAction.payload) {
+                if (mat.url) {
+                  try {
+                    await sendEvolutionMedia(evolution, instanceName, cleanPhone, mat);
+                  } catch (mErr) {
+                    console.error('Erro ao enviar material do curso:', mErr);
+                  }
                 }
               }
             }
 
-            // 3. Atualizar a prévia do chat no CRM com a resposta da IA
+            // 3. Se a IA acionou envio de material individual [ENVIAR_MATERIAL: ...]
+            for (const action of aiResult.actions) {
+              if (action.type === 'send_media' && action.payload?.url) {
+                try {
+                  await sendEvolutionMedia(evolution, instanceName, cleanPhone, action.payload);
+                } catch (mErr) {
+                  console.error('Erro ao enviar mídia avulsa:', mErr);
+                }
+              }
+            }
+
+            // 4. Se a IA gerou PIX [GERAR_PIX]
+            const pixAction = aiResult.actions.find((a) => a.type === 'pix_generated');
+            if (pixAction && pixAction.payload) {
+              const pix = pixAction.payload;
+              const pixInfoMsg = `💳 *DADOS PARA PAGAMENTO VIA PIX:*
+📚 *Curso:* ${pix.courseName}
+💰 *Valor:* R$ ${Number(pix.amount).toFixed(2)}
+👤 *Beneficiário:* ${pix.merchantName || 'Equipe do Curso'}
+🔑 *Chave PIX:* \`${pix.pixKey}\`
+
+👇 *Código Copia e Cola oficial abaixo:*`;
+
+              await evolution.sendText(instanceName, {
+                number: cleanPhone,
+                text: pixInfoMsg,
+              });
+
+              if (pix.brCode) {
+                // Envia UMA mensagem exclusiva apenas com o código puro para o cliente só tocar e copiar
+                await evolution.sendText(instanceName, {
+                  number: cleanPhone,
+                  text: pix.brCode,
+                });
+              }
+            }
+
+            // 5. Se a IA liberou os Super Bônus [LIBERAR_BONUS]
+            const bonusAction = aiResult.actions.find((a) => a.type === 'deliver_bonus');
+            if (bonusAction && bonusAction.payload) {
+              const { bonuses } = bonusAction.payload;
+              if (Array.isArray(bonuses) && bonuses.length > 0) {
+                const bonusText =
+                  `🎁 *SEUS SUPER BÔNUS EXCLUSIVOS:*\n\n` +
+                  bonuses
+                    .map(
+                      (b: any) =>
+                        `✨ *${b.name}* ${b.value ? `(Valor de R$ ${Number(b.value).toFixed(2)} Grátis)` : ''}\n${b.description || ''}`
+                    )
+                    .join('\n\n');
+
+                await evolution.sendText(instanceName, {
+                  number: cleanPhone,
+                  text: bonusText,
+                });
+              }
+            }
+
+            // 6. Atualizar a prévia do chat no CRM e gravar a mensagem de saída
             await supabase
               .from('chats')
               .update({
@@ -302,6 +407,17 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
                 last_message_at: new Date().toISOString(),
               })
               .eq('id', chat.id);
+
+            await supabase.from('messages').insert({
+              organization_id: organizationId,
+              chat_id: chat.id,
+              instance_id: instanceId,
+              direction: 'outbound',
+              sender_type: 'bot',
+              type: 'text',
+              content: aiResult.replyText,
+              status: 'sent',
+            });
           }
         } catch (aiErr) {
           console.error('Erro ao processar resposta do Bot de Cursos IA:', aiErr);

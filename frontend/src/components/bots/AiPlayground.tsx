@@ -10,7 +10,9 @@ import {
   Check, 
   Copy, 
   MessageSquare,
-  AlertTriangle
+  AlertTriangle,
+  Gift,
+  PackageCheck
 } from 'lucide-react';
 import { Course } from '../../types';
 import { api } from '../../lib/api';
@@ -212,6 +214,22 @@ export const AiPlayground: React.FC<AiPlaygroundProps> = ({ courses, organizatio
                         key={i}
                         className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-[11px] text-emerald-300 flex items-center gap-2"
                       >
+                        {act.type === 'deliver_course_materials' && (
+                          <>
+                            <PackageCheck className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>
+                              <b>Materiais Entregues:</b> {Array.isArray(act.payload) ? `${act.payload.length} arquivos/apostilas enviados no WhatsApp` : 'Conteúdo do curso enviado'}
+                            </span>
+                          </>
+                        )}
+                        {act.type === 'deliver_bonus' && (
+                          <>
+                            <Gift className="w-3.5 h-3.5 text-purple-400" />
+                            <span>
+                              <b>Super Bônus Liberado:</b> Acesso VIP ao bônus enviado com sucesso!
+                            </span>
+                          </>
+                        )}
                         {act.type === 'send_media' && (
                           <>
                             <FileText className="w-3.5 h-3.5 text-blue-400" />
@@ -221,12 +239,27 @@ export const AiPlayground: React.FC<AiPlaygroundProps> = ({ courses, organizatio
                           </>
                         )}
                         {act.type === 'pix_generated' && (
-                          <>
-                            <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>
-                              <b>PIX Gerado:</b> Código Copia e Cola anexado à mensagem
-                            </span>
-                          </>
+                          <div className="w-full space-y-1">
+                            <div className="flex items-center gap-2">
+                              <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>
+                                <b>PIX Oficial:</b> R$ {Number(act.payload?.amount || 0).toFixed(2)} (Chave: {act.payload?.pixKey})
+                              </span>
+                            </div>
+                            {act.payload?.brCode && (
+                              <div className="mt-1 p-2 bg-slate-900/90 rounded-lg border border-slate-700/60 font-mono text-[10px] text-slate-300 break-all select-all flex items-center justify-between gap-2">
+                                <span className="line-clamp-2">{act.payload.brCode}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => navigator.clipboard.writeText(act.payload.brCode)}
+                                  className="p-1 hover:bg-slate-800 rounded text-emerald-400 flex-shrink-0"
+                                  title="Copiar PIX"
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         )}
                         {act.type === 'human_handover' && (
                           <>

@@ -53,7 +53,7 @@ export interface AiSettings {
 }
 
 export interface AiAction {
-  type: 'send_media' | 'pix_generated' | 'human_handover';
+  type: 'send_media' | 'pix_generated' | 'human_handover' | 'deliver_course_materials' | 'deliver_bonus';
   payload?: any;
 }
 
@@ -228,13 +228,8 @@ ${activeCourse.original_price ? `VALOR NORMAL (SEM DESCONTO): R$ ${Number(active
 PERSONA E INSTRUÇÕES ESPECÍFICAS DESTE CURSO (SIGA FIELMENTE):
 ${activeCourse.ai_persona || 'Atenda com entusiasmo, tire dúvidas com clareza, mostre a transformação do curso e conduza para o fechamento.'}
 
-MATERIAIS E AMOSTRAS DISPONÍVEIS:
+MATERIAIS E APOSTILAS DO CURSO CADASTRADAS:
 ${materialsStr}
-
-* REGRA DE ENVIO DE MATERIAIS:
-Se o cliente pedir para ver uma amostra, demonstração, resumo ou conteúdo grátis, mencione com entusiasmo e inclua na sua resposta a tag exata:
-[ENVIAR_MATERIAL: ID_DO_MATERIAL] (ex: [ENVIAR_MATERIAL: ${activeCourse.materials[0]?.id || '1'}])
-O sistema irá interceptar essa tag e enviar o arquivo/link automaticamente ao cliente!
 
 BÔNUS EXCLUSIVOS INCLUSOS NA COMPRA HOJE:
 ${bonusesStr}
@@ -242,26 +237,47 @@ ${bonusesStr}
 QUEBRA DE OBJEÇÕES:
 ${objectionsStr}
 
-DADOS DE PAGAMENTO (PIX):
-- Chave PIX: ${activeCourse.pix_key || 'Chave cadastrada no sistema'}
-- Titular: ${activeCourse.pix_name || 'Beneficiário'}
-- Valor: R$ ${Number(activeCourse.price).toFixed(2)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ESTRATÉGIA DO FUNIL DE ALTA CONVERSÃO EM 3 ETAPAS (SIGA COM RIGOR ABSOLUTO):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-* REGRA CRUCIAL DE COBRANÇA / PIX:
-Quando o cliente concordar em comprar, disser que quer o curso, perguntar como pagar, ou pedir a chave PIX:
-1. Comemore a decisão dele e reforce que ele terá acesso imediato com todos os bônus inclusos.
-2. Inclua OBRIGATORIAMENTE a tag exata: [GERAR_PIX]
-O nosso sistema automatizado irá gerar a chave oficial e o código "PIX Copia e Cola" do Banco Central e anexar à sua mensagem!
+📌 ETAPA 1: APRESENTAÇÃO + PROPOSTA DO VOTO DE CONFIANÇA
+- Quando o cliente iniciar a conversa, perguntar sobre o curso ou quiser detalhes:
+1. Cumprimente com simpatia e entusiasmo (Nome do cliente: ${customerName || 'Amigo(a)'}).
+2. Apresente os benefícios práticos do curso (o que ele vai aprender a fabricar/fazer) e a oportunidade de economizar ou lucrar.
+3. Mencione o valor promocional de apenas R$ ${Number(activeCourse.price).toFixed(2)} (desconto especial).
+4. FAÇA A PROPOSTA DO VOTO DE CONFIANÇA (MANDATÓRIO):
+   Diga que você confia tanto na honestidade das pessoas e na qualidade do conteúdo que vai fazer algo diferente:
+   Pergunte se pode mandar o material completo agora mesmo para ele ver e conferir com os próprios olhos antes de pagar. Se ele gostar, ele faz o PIX de R$ ${Number(activeCourse.price).toFixed(2)} depois.
+5. Finalize sempre com a pergunta de fechamento: "Posso te mandar o material agora para você dar uma olhada?"
+* IMPORTANTE: NESTA ETAPA 1, NÃO entregue arquivos nem envie dados do PIX ainda. Aguarde a confirmação dele!
 
-* REGRA DE ATENDIMENTO HUMANO:
-Se o cliente fizer uma pergunta muito fora do escopo do curso ou insistir que deseja falar com um atendente humano, seja educado e inclua a tag:
-[CHAMAR_HUMANO]
+📌 ETAPA 2: ENTREGA DO CONTEÚDO + COBRANÇA PIX + ISCA DO SUPER BÔNUS
+- Quando o cliente concordar com a proposta (ex: "sim", "pode mandar", "quero", "manda aí", "mande", "pode enviar"):
+1. Comemore com alegria a confiança mútua ("Maravilha! Sabia que podia confiar em você! Já estou enviando todo o material para você conferir acima 🚀").
+2. Inclua OBRIGATORIAMENTE a tag exata: [ENTREGAR_CURSO]
+   (O sistema automatizado irá disparar todos os materiais e arquivos do curso para o cliente).
+3. Inclua OBRIGATORIAMENTE a tag exata: [GERAR_PIX]
+   (O sistema automatizado irá enviar os dados do PIX e uma mensagem exclusiva com o código Copia e Cola para facilitar o pagamento no celular).
+4. REFORCE A ISCA DO SUPER BÔNUS:
+   Diga: "🎁 E olha que especial: assim que você fizer o PIX de R$ ${Number(activeCourse.price).toFixed(2)} e me mandar o comprovante aqui, vou liberar imediatamente para você o nosso SUPER BÔNUS EXCLUSIVO (${bonusesStr || 'Guia Prático Avançado Bônus'})!".
 
-REGRAS DE CONVERSAÇÃO NO WHATSAPP:
+📌 ETAPA 3: CONFIRMAÇÃO DO PAGAMENTO + LIBERAÇÃO DO SUPER BÔNUS
+- Quando o cliente disser que pagou ("paguei", "já fiz o pix", "tá pago", "mandei", "segue o comprovante" ou enviar foto de comprovante):
+1. Agradeça calorosamente pela honestidade, integridade e parceria! ("Sensacional! Muito obrigado pela sua honestidade e parabéns pela excelente decisão! 👏🎉").
+2. Diga que o acesso dele está 100% vitalício e garantido.
+3. Inclua OBRIGATORIAMENTE a tag exata: [LIBERAR_BONUS]
+   (O sistema automatizado irá liberar o Super Bônus prometido).
+4. Finalize desejando muito sucesso e se colocando à disposição para tirar qualquer dúvida prática.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REGRAS GERAIS DE CONVERSAÇÃO NO WHATSAPP:
 - Responda como uma pessoa real no WhatsApp: use mensagens diretas, parágrafos curtos (1 a 3 frases por parágrafo), tom caloroso e natural.
 - Nome do cliente: ${customerName ? customerName : 'Cliente'}.
 - Use emojis com bom senso para deixar a leitura agradável.
-- NUNCA diga que você é um robô, IA da OpenAI ou ChatGPT. Você é o consultor de atendimento do curso.
+- NUNCA diga que você é um robô, IA da OpenAI ou ChatGPT. Você é o consultor oficial do curso.
+- Se o cliente tiver dúvidas sobre o curso, tire as dúvidas com clareza e volte para a pergunta da etapa correspondente.
+- Se o cliente solicitar atendimento humano explicitamente, use a tag [CHAMAR_HUMANO].
 `.trim();
   } else {
     // 5.2 Prompt GERAL - Cliente ainda não escolheu um curso
@@ -343,7 +359,28 @@ SEU OBJETIVO NESTE PRIMEIRO CONTATO:
 
     const actions: AiAction[] = [];
 
-    // 8. Processar Ação: [ENVIAR_MATERIAL: ...]
+    // 8. Processar Ação: [ENTREGAR_CURSO]
+    if (rawReply.includes('[ENTREGAR_CURSO]') && activeCourse) {
+      actions.push({
+        type: 'deliver_course_materials',
+        payload: activeCourse.materials,
+      });
+      rawReply = rawReply.replace(/\[ENTREGAR_CURSO\]/gi, '').trim();
+    }
+
+    // 9. Processar Ação: [LIBERAR_BONUS]
+    if (rawReply.includes('[LIBERAR_BONUS]') && activeCourse) {
+      actions.push({
+        type: 'deliver_bonus',
+        payload: {
+          bonuses: activeCourse.bonuses,
+          materials: activeCourse.materials,
+        },
+      });
+      rawReply = rawReply.replace(/\[LIBERAR_BONUS\]/gi, '').trim();
+    }
+
+    // 10. Processar Ação: [ENVIAR_MATERIAL: ...]
     const materialTagMatch = rawReply.match(/\[ENVIAR_MATERIAL:\s*([^\]]+)\]/i);
     if (materialTagMatch && activeCourse) {
       const targetQuery = cleanTextForMatching(materialTagMatch[1]);
@@ -364,12 +401,11 @@ SEU OBJETIVO NESTE PRIMEIRO CONTATO:
       rawReply = rawReply.replace(/\[ENVIAR_MATERIAL:\s*[^\]]+\]/gi, '').trim();
     }
 
-    // 9. Processar Ação: [CHAMAR_HUMANO]
+    // 11. Processar Ação: [CHAMAR_HUMANO]
     if (rawReply.includes('[CHAMAR_HUMANO]')) {
       actions.push({ type: 'human_handover' });
       rawReply = rawReply.replace(/\[CHAMAR_HUMANO\]/gi, '').trim();
       if (chat) {
-        // Pausar IA para este chat
         await supabase
           .from('chats')
           .update({
@@ -379,12 +415,8 @@ SEU OBJETIVO NESTE PRIMEIRO CONTATO:
       }
     }
 
-    // 10. Processar Ação: [GERAR_PIX]
+    // 12. Processar Ação: [GERAR_PIX]
     if (rawReply.includes('[GERAR_PIX]') && activeCourse) {
-      actions.push({ type: 'pix_generated' });
-      rawReply = rawReply.replace(/\[GERAR_PIX\]/gi, '').trim();
-
-      // Gerar o código BRCode Copia e Cola Oficial
       let brCode = '';
       try {
         brCode = generatePixBrcode({
@@ -399,22 +431,19 @@ SEU OBJETIVO NESTE PRIMEIRO CONTATO:
         console.error('Erro ao gerar código PIX Copia e Cola:', err);
       }
 
-      const pixBlock = `
-\n\n━━━━━━━━━━━━━━━━━━━━
-💳 *DADOS PARA PAGAMENTO VIA PIX:*
-📚 *Curso:* ${activeCourse.name}
-💰 *Valor:* R$ ${Number(activeCourse.price).toFixed(2)}
-👤 *Beneficiário:* ${activeCourse.pix_name || 'Equipe do Curso'}
-🔑 *Chave PIX:* \`${activeCourse.pix_key}\`
-${
-  brCode
-    ? `\n📋 *PIX Copia e Cola (Basta copiar e colar no banco):*\n\`${brCode}\``
-    : ''
-}
-━━━━━━━━━━━━━━━━━━━━
-📲 *Assim que realizar o pagamento, me envie o comprovante aqui para liberarmos seu acesso imediatamente!* 🚀`.trim();
+      actions.push({
+        type: 'pix_generated',
+        payload: {
+          pixKey: activeCourse.pix_key,
+          pixKeyType: activeCourse.pix_key_type,
+          merchantName: activeCourse.pix_name || 'Equipe do Curso',
+          amount: Number(activeCourse.price),
+          courseName: activeCourse.name,
+          brCode,
+        },
+      });
 
-      rawReply = `${rawReply}\n\n${pixBlock}`;
+      rawReply = rawReply.replace(/\[GERAR_PIX\]/gi, '').trim();
     }
 
     return {

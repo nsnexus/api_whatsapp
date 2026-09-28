@@ -19,13 +19,15 @@ import {
   ExternalLink,
   Zap,
   TrendingUp,
-  RefreshCw
+  RefreshCw,
+  Workflow
 } from 'lucide-react';
 import { Course, AiSettings, Instance } from '../../types';
 import { supabase } from '../../lib/supabase';
 import { CourseModal } from './CourseModal';
 import { AiSettingsTab } from './AiSettingsTab';
 import { AiPlayground } from './AiPlayground';
+import { FunnelFlowView } from './FunnelFlowView';
 
 interface CoursesBotsViewProps {
   organizationId: string;
@@ -36,7 +38,7 @@ export const CoursesBotsView: React.FC<CoursesBotsViewProps> = ({
   organizationId,
   instances = [],
 }) => {
-  const [activeTab, setActiveTab] = useState<'cursos' | 'config' | 'playground'>('cursos');
+  const [activeTab, setActiveTab] = useState<'cursos' | 'fluxo' | 'config' | 'playground'>('cursos');
   const [courses, setCourses] = useState<Course[]>([]);
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -245,6 +247,18 @@ export const CoursesBotsView: React.FC<CoursesBotsViewProps> = ({
           >
             <BookOpen className="w-4 h-4" />
             <span>Meus Cursos & Funis ({courses.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('fluxo')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+              activeTab === 'fluxo'
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-md shadow-emerald-500/10'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+            }`}
+          >
+            <Workflow className="w-4 h-4" />
+            <span>Fluxograma do Funil (3 Etapas)</span>
           </button>
 
           <button
@@ -469,6 +483,13 @@ export const CoursesBotsView: React.FC<CoursesBotsViewProps> = ({
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'fluxo' && (
+          <FunnelFlowView
+            courses={courses}
+            onOpenSimulator={() => setActiveTab('playground')}
+          />
         )}
 
         {activeTab === 'config' && (
