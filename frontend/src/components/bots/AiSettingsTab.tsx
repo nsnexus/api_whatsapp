@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Key, 
   Sparkles, 
@@ -25,7 +25,7 @@ interface AiSettingsTabProps {
 export const AiSettingsTab: React.FC<AiSettingsTabProps> = ({ settings, onSaveSettings }) => {
   const [apiKey, setApiKey] = useState(settings?.openai_api_key || '');
   const [showKey, setShowKey] = useState(false);
-  const [model, setModel] = useState(settings?.openai_model || 'gpt-4o-mini');
+  const [model, setModel] = useState(settings?.openai_model || 'gpt-5.6-luna');
   const [isEnabled, setIsEnabled] = useState(settings?.is_enabled ?? true);
   const [handoverMinutes, setHandoverMinutes] = useState(String(settings?.human_handover_minutes || 60));
   const [greetingMessage, setGreetingMessage] = useState(
@@ -36,7 +36,30 @@ export const AiSettingsTab: React.FC<AiSettingsTabProps> = ({ settings, onSaveSe
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingKey, setIsSavingKey] = useState(false);
+  const [keySavedSuccess, setKeySavedSuccess] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // Sincroniza estado com as configurações salvas no Supabase quando carregadas
+  useEffect(() => {
+    if (settings) {
+      if (settings.openai_api_key !== undefined) {
+        setApiKey(settings.openai_api_key || '');
+      }
+      if (settings.openai_model) {
+        setModel(settings.openai_model);
+      }
+      if (settings.is_enabled !== undefined) {
+        setIsEnabled(settings.is_enabled);
+      }
+      if (settings.human_handover_minutes !== undefined) {
+        setHandoverMinutes(String(settings.human_handover_minutes));
+      }
+      if (settings.greeting_message) {
+        setGreetingMessage(settings.greeting_message);
+      }
+    }
+  }, [settings]);
 
   const handleTestKey = async () => {
     if (!apiKey.trim()) {
@@ -52,7 +75,7 @@ export const AiSettingsTab: React.FC<AiSettingsTabProps> = ({ settings, onSaveSe
       if (res.ok) {
         setTestResult({
           ok: true,
-          message: `Conectado com sucesso! Resposta do modelo ${res.model}: "${res.reply}"`,
+          message: `Conectado com sucesso! Resposta do modelo ${res.model || model}: "${res.reply}"`,
         });
       }
     } catch (err: any) {
@@ -62,6 +85,29 @@ export const AiSettingsTab: React.FC<AiSettingsTabProps> = ({ settings, onSaveSe
       });
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const handleQuickSaveKey = async () => {
+    if (!apiKey.trim()) {
+      alert('Digite sua chave da OpenAI antes de salvar.');
+      return;
+    }
+
+    setIsSavingKey(true);
+    setKeySavedSuccess(false);
+
+    try {
+      await onSaveSettings({
+        openai_api_key: apiKey.trim(),
+        openai_model: model,
+      });
+      setKeySavedSuccess(true);
+      setTimeout(() => setKeySavedSuccess(false), 4000);
+    } catch (err: any) {
+      alert('Erro ao salvar chave da OpenAI: ' + err.message);
+    } finally {
+      setIsSavingKey(false);
     }
   };
 
@@ -99,7 +145,7 @@ export const AiSettingsTab: React.FC<AiSettingsTabProps> = ({ settings, onSaveSe
             Motor de Inteligência Artificial Oficial - OpenAI ChatGPT
           </h3>
           <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-            Seus bots de vendas utilizam a API oficial do ChatGPT para conversar com os clientes em tempo real,
+            Seus bots de vendas utilizam a API oficial da OpenAI para conversar com os clientes em tempo real,
             demonstrar materiais, rebater objeções de preço e gerar códigos PIX dinâmicos diretamente no WhatsApp!
           </p>
         </div>
@@ -113,14 +159,21 @@ export const AiSettingsTab: React.FC<AiSettingsTabProps> = ({ settings, onSaveSe
               <Key className="w-5 h-5 text-emerald-400" />
               <h4 className="text-sm font-bold text-white">Chave de API da OpenAI (Secret Key)</h4>
             </div>
-            <a
-              href="https://platform.openai.com/api-keys"
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs text-emerald-400 hover:text-emerald-300 underline font-semibold"
-            >
-              Obter Chave no Painel OpenAI
-            </a>
+            <div className="flex items-center gap-3">
+              {settings?.openai_api_key && (
+                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1 font-semibold">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Salva no Banco
+                </span>
+              )}
+              <a
+                href="https://platform.openai.com/api-keys"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-emerald-400 hover:text-emerald-300 underline font-semibold"
+              >
+                Obter Chave no Painel OpenAI
+              </a>
+            </div>
           </div>
 
           <div>
@@ -133,9 +186,9 @@ export const AiSettingsTab: React.FC<AiSettingsTabProps> = ({ settings, onSaveSe
                 placeholder="sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                className="w-full bg-[#111726] border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-emerald-500 pr-24"
+                className="w-full bg-[#111726] border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-emerald-500 pr-48"
               />
-              <div className="absolute right-2 top-2 flex items-center gap-1">
+              <div className="absolute right-2 top-2 flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setShowKey(!showKey)}
@@ -149,9 +202,19 @@ export const AiSettingsTab: React.FC<AiSettingsTabProps> = ({ settings, onSaveSe
                   type="button"
                   onClick={handleTestKey}
                   disabled={isTesting || !apiKey}
-                  className="px-3 py-1.5 bg-emerald-500 text-slate-950 rounded-lg text-xs font-bold hover:bg-emerald-400 transition-colors disabled:opacity-40"
+                  className="px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-200 rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors disabled:opacity-40"
                 >
                   {isTesting ? 'Testando...' : 'Testar'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleQuickSaveKey}
+                  disabled={isSavingKey || !apiKey}
+                  className="px-3 py-1.5 bg-emerald-500 text-slate-950 rounded-lg text-xs font-bold hover:bg-emerald-400 transition-colors disabled:opacity-40 flex items-center gap-1 shadow-md shadow-emerald-500/20"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{isSavingKey ? 'Salvando...' : 'Salvar Chave'}</span>
                 </button>
               </div>
             </div>
@@ -160,21 +223,41 @@ export const AiSettingsTab: React.FC<AiSettingsTabProps> = ({ settings, onSaveSe
             </p>
           </div>
 
+          {/* Feedback de Chave Salva */}
+          {keySavedSuccess && (
+            <div className="p-3.5 rounded-xl text-xs flex items-center gap-2.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 animate-fadeIn">
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
+              <span className="font-semibold">Chave da OpenAI salva com sucesso no banco de dados!</span>
+            </div>
+          )}
+
           {/* Feedback de Teste */}
           {testResult && (
             <div
-              className={`p-3.5 rounded-xl text-xs flex items-center gap-2.5 ${
+              className={`p-3.5 rounded-xl text-xs flex items-center justify-between gap-2.5 ${
                 testResult.ok
                   ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300'
                   : 'bg-rose-500/10 border border-rose-500/30 text-rose-300'
               }`}
             >
-              {testResult.ok ? (
-                <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
-              ) : (
-                <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+              <div className="flex items-center gap-2.5">
+                {testResult.ok ? (
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+                )}
+                <span className="font-medium">{testResult.message}</span>
+              </div>
+              {testResult.ok && !keySavedSuccess && (
+                <button
+                  type="button"
+                  onClick={handleQuickSaveKey}
+                  disabled={isSavingKey}
+                  className="px-3 py-1 bg-emerald-500 text-slate-950 rounded-md font-bold text-[11px] hover:bg-emerald-400 transition-colors flex-shrink-0"
+                >
+                  Salvar Chave Agora
+                </button>
               )}
-              <span className="font-medium">{testResult.message}</span>
             </div>
           )}
         </div>
@@ -186,71 +269,104 @@ export const AiSettingsTab: React.FC<AiSettingsTabProps> = ({ settings, onSaveSe
               <Cpu className="w-5 h-5 text-emerald-400" />
               <h4 className="text-sm font-bold text-white">Modelo & Desempenho do ChatGPT (OpenAI)</h4>
             </div>
-            <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-              GPT-4o Mini Ativo
+            <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 font-mono">
+              {model === 'gpt-5.6-luna' ? 'GPT-5.6 Luna Ativo' : model === 'gpt-4o-mini' ? 'GPT-4o Mini Ativo' : 'GPT-4o Ativo'}
             </span>
           </div>
 
-          {/* Dica de Economia Explicativa */}
+          {/* Dica Explicativa */}
           <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-xs text-slate-300 space-y-1">
             <p className="font-bold text-emerald-300 flex items-center gap-1.5">
               <Zap className="w-4 h-4 text-emerald-400" />
-              <span>Qual modelo é mais em conta para vender cursos?</span>
+              <span>Modelo Recomendado: GPT-5.6 Luna</span>
             </p>
             <p className="text-[11px] text-slate-300 leading-relaxed">
-              O <strong className="text-white">GPT-4o Mini</strong> é oficialmente o modelo mais econômico e rápido de toda a OpenAI.
-              Ele custa apenas <strong className="text-emerald-400">$0.15 por 1 Milhão de tokens</strong> (menos de R$ 0,0005 por mensagem trocada no WhatsApp),
-              sendo mais de <strong className="text-white">95% mais barato que o GPT-4o</strong> e respondendo instantaneamente em cerca de 1 segundo!
+              O <strong className="text-white">GPT-5.6 Luna</strong> é o modelo de última geração da OpenAI projetado especificamente para alto volume,
+              conversas naturais instantâneas no WhatsApp e custos ultra-otimizados.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            {/* Opção 1: GPT-5.6 Luna */}
+            <div
+              onClick={() => setModel('gpt-5.6-luna')}
+              className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between ${
+                model === 'gpt-5.6-luna'
+                  ? 'bg-emerald-500/15 border-emerald-500/60 shadow-lg shadow-emerald-500/15 ring-1 ring-emerald-500/40'
+                  : 'bg-[#111726] border-slate-800 hover:border-slate-700'
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-emerald-400" /> GPT-5.6 Luna
+                  </span>
+                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black">
+                    RECOMENDADO
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 font-medium leading-snug">
+                  Nova geração GPT-5.6. Velocidade máxima em milissegundos, conversa fluida e alta conversão para WhatsApp.
+                </p>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-emerald-500/20 flex items-center justify-between text-[10px] text-emerald-400 font-mono">
+                <span>Ultra-econômico</span>
+                <span>&lt;1s latência</span>
+              </div>
+            </div>
+
+            {/* Opção 2: GPT-4o Mini */}
             <div
               onClick={() => setModel('gpt-4o-mini')}
-              className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+              className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between ${
                 model === 'gpt-4o-mini'
                   ? 'bg-emerald-500/15 border-emerald-500/60 shadow-lg shadow-emerald-500/15'
                   : 'bg-[#111726] border-slate-800 hover:border-slate-700'
               }`}
             >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <Zap className="w-3.5 h-3.5 text-emerald-400" /> GPT-4o Mini
-                </span>
-                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black">
-                  MAIS EM CONTA • PADRÃO
-                </span>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-teal-400" /> GPT-4o Mini
+                  </span>
+                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-bold border border-slate-700">
+                    Econômico
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  Versão consagrada da série GPT-4o para respostas ágeis e atendimento geral de cursos.
+                </p>
               </div>
-              <p className="text-[11px] text-slate-300 font-medium">
-                Custo quase zero (fração de centavo), respostas em ~1 segundo, excelente conversão para venda de cursos, apresentação de aulas e cobrança no PIX.
-              </p>
-              <div className="mt-3 pt-2.5 border-t border-emerald-500/20 flex items-center justify-between text-[10px] text-emerald-400 font-mono">
-                <span>$0.15 / 1M tokens</span>
+              <div className="mt-3 pt-2.5 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                <span>$0.15 / 1M</span>
                 <span>~1s latência</span>
               </div>
             </div>
 
+            {/* Opção 3: GPT-4o Flagship */}
             <div
               onClick={() => setModel('gpt-4o')}
-              className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+              className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between ${
                 model === 'gpt-4o'
                   ? 'bg-blue-500/15 border-blue-500/60 shadow-lg shadow-blue-500/15'
                   : 'bg-[#111726] border-slate-800 hover:border-slate-700'
               }`}
             >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-blue-400" /> GPT-4o Flagship
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold">
-                  Avançado
-                </span>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-400" /> GPT-4o Flagship
+                  </span>
+                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold">
+                    Avançado
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  Máxima capacidade analítica para perguntas complexas ou mentorias de altíssimo ticket.
+                </p>
               </div>
-              <p className="text-[11px] text-slate-400">
-                Máxima capacidade analítica para perguntas extremamente densas ou mentorias VIP de altíssimo valor (16x mais caro que o Mini).
-              </p>
               <div className="mt-3 pt-2.5 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                <span>$2.50 / 1M tokens</span>
+                <span>$2.50 / 1M</span>
                 <span>~3s latência</span>
               </div>
             </div>

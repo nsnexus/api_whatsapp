@@ -478,7 +478,7 @@ export default {
               Authorization: `Bearer ${body.apiKey}`,
             },
             body: JSON.stringify({
-              model: body.model || 'gpt-4o-mini',
+              model: body.model || 'gpt-5.6-luna',
               messages: [{ role: 'user', content: 'Teste de conexão rápido. Responda apenas: OK' }],
               max_tokens: 10,
             }),

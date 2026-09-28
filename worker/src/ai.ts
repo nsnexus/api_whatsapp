@@ -301,7 +301,7 @@ SEU OBJETIVO NESTE PRIMEIRO CONTATO:
   openAiMessages.push({ role: 'user', content: incomingText });
 
   // 7. Chamada à API da OpenAI (ChatGPT)
-  const modelToUse = aiSettings.openai_model || 'gpt-4o-mini';
+  const modelToUse = aiSettings.openai_model || 'gpt-5.6-luna';
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {

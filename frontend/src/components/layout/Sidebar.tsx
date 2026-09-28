@@ -292,7 +292,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Bot className="w-4 h-4 flex-shrink-0 text-emerald-400" />
               <span>Bots & Cursos IA</span>
               <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-md font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                GPT-4o Mini
+                GPT-5.6 Luna
               </span>
             </button>
 
