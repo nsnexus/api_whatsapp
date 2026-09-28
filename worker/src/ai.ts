@@ -150,16 +150,83 @@ export async function generateCourseAiReply(params: {
     return null;
   }
 
-  // 4. Identificar o curso ativo
+  // 4. Identificar se a mensagem tem relação estrita com cursos ou com um funil em andamento
   let activeCourse: Course | undefined;
   const normalizedIncoming = cleanTextForMatching(incomingText);
 
-  // A. Se foi passado curso forçado (ex: no simulador)
+  // Palavras-chave que indicam intenção explícita sobre cursos
+  const GENERAL_COURSE_KEYWORDS = [
+    'curso',
+    'cursos',
+    'treinamento',
+    'treinamentos',
+    'apostila',
+    'apostilas',
+    'metodo',
+    'metodos',
+    'modulo',
+    'modulos',
+    'inscricao',
+    'inscricoes',
+    'matricula',
+    'matriculas',
+    'vaga',
+    'vagas',
+    'certificado',
+    'certificados',
+    'comprar curso',
+    'preco do curso',
+    'valor do curso',
+    'quero aprender',
+    'quero o curso',
+    'conteudo do curso',
+    'fazer o curso',
+    'sabonete',
+    'sabonetes',
+  ];
+
+  // Respostas esperadas de quem já está dentro do funil de vendas conversando ativamente com o bot
+  const FUNNEL_CONTINUATION_KEYWORDS = [
+    'sim',
+    'quero',
+    'pode',
+    'pode mandar',
+    'pode enviar',
+    'manda',
+    'manda ai',
+    'mande',
+    'envia',
+    'enviar',
+    'topo',
+    'aceito',
+    'claro',
+    'com certeza',
+    'fechado',
+    'vamos',
+    'paguei',
+    'fiz o pix',
+    'ta pago',
+    'tá pago',
+    'ja fiz',
+    'mandei',
+    'comprovante',
+    'pix',
+    'chave pix',
+    'codigo pix',
+    'quanto custa',
+    'quanto e',
+    'qual o valor',
+    'tem desconto',
+    'como funciona',
+    'garantia',
+  ];
+
+  // A. Se foi passado curso forçado (ex: no simulador do CRM)
   if (forceCourseId) {
     activeCourse = courses.find((c) => c.id === forceCourseId);
   }
 
-  // B. Verificar se a mensagem do cliente dispara algum gatilho de curso
+  // B. Verificar se a mensagem do cliente dispara algum gatilho específico de curso
   if (!activeCourse) {
     for (const course of courses) {
       const matchTrigger = course.triggers.some((trig) => {
@@ -177,30 +244,40 @@ export async function generateCourseAiReply(params: {
     }
   }
 
-  // C. Se não achou gatilho na mensagem atual, usar o curso que já estava ativo nesta conversa
-  if (!activeCourse && chat?.active_course_id) {
-    activeCourse = courses.find((c) => c.id === chat.active_course_id);
-  }
+  // C. Se a mensagem contém palavras-chave gerais sobre cursos (ex: "tem curso?", "qual valor da apostila?")
+  const hasGeneralCourseKeyword = GENERAL_COURSE_KEYWORDS.some((kw) => normalizedIncoming.includes(kw));
 
-  // D. Se ainda não achou, buscar pelo histórico recente de mensagens
-  if (!activeCourse && historyMessages.length > 0) {
-    for (let i = historyMessages.length - 1; i >= 0; i--) {
-      const cleanH = cleanTextForMatching(historyMessages[i].content);
-      const found = courses.find(
-        (c) =>
-          cleanH.includes(cleanTextForMatching(c.name)) ||
-          c.triggers.some((tr) => cleanH.includes(cleanTextForMatching(tr)))
-      );
-      if (found) {
-        activeCourse = found;
-        break;
-      }
+  if (!activeCourse && hasGeneralCourseKeyword) {
+    if (chat?.active_course_id) {
+      activeCourse = courses.find((c) => c.id === chat.active_course_id);
+    }
+    // Apenas seleciona o curso único se a pessoa EXPLICITAMENTE falou sobre cursos
+    if (!activeCourse && courses.length === 1) {
+      activeCourse = courses[0];
     }
   }
 
-  // Se ainda assim não achou e houver apenas 1 curso ativo na conta, utilizar ele
-  if (!activeCourse && courses.length === 1) {
-    activeCourse = courses[0];
+  // D. Se não mencionou curso, verificar se é uma continuação válida de um diálogo de funil em andamento
+  // (ex: o robô perguntou "Posso te mandar o material?" e o cliente respondeu "Sim", "Pode", "Paguei", etc.)
+  const hasRecentBotInteraction = historyMessages.some((m) => m.role === 'assistant');
+  const isFunnelReply = FUNNEL_CONTINUATION_KEYWORDS.some((kw) => {
+    if (kw.length <= 4) {
+      const regex = new RegExp(`(^|\\s)${kw}(\\s|!|\\?|\\.|$)`, 'i');
+      return regex.test(normalizedIncoming);
+    }
+    return normalizedIncoming.includes(kw);
+  });
+
+  if (!activeCourse && hasRecentBotInteraction && isFunnelReply && chat?.active_course_id) {
+    activeCourse = courses.find((c) => c.id === chat.active_course_id);
+  }
+
+  // 🛑 FILTRO DE SEGURANÇA MÁXIMA: Se a mensagem NÃO contém gatilho de curso, NÃO contém palavra de curso
+  // e NÃO é continuação de funil em andamento:
+  // IGNORAR IMEDIATAMENTE (sem chamar a OpenAI, sem gastar tokens e sem responder mensagens pessoais/outros clientes)
+  if (!activeCourse && !hasGeneralCourseKeyword) {
+    console.log(`[BOT CURSOS] Mensagem ignorada por não ter relação com curso: "${incomingText}"`);
+    return null;
   }
 
   // Atualizar no banco o curso ativo da conversa se houver mudança
@@ -241,6 +318,15 @@ export async function generateCourseAiReply(params: {
         : '';
 
     systemPrompt = `
+🚨 REGRA NÚMERO 1 ABSOLUTA (LEIA ANTES DE TUDO):
+Analise com rigor extremo a intenção da mensagem do cliente:
+- Você SÓ PODE RESPONDER se o cliente estiver tratando especificamente sobre o curso "${activeCourse.name}" ou sobre o processo de dúvidas, negociação ou compra deste curso.
+- SE A MENSAGEM DO CLIENTE NÃO FOR SOBRE O CURSO (ex: conversas pessoais, familiares, saudações aleatórias sem menção a curso, cobranças externas, outros produtos ou serviços, engano de número ou piadas):
+👉 Responda EXATAMENTE E APENAS COM A PALAVRA: [IGNORAR]
+NÃO cumprimente, NÃO ofereça o curso, NÃO peça desculpas e NÃO diga que é uma IA. Apenas responda: [IGNORAR]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DADOS DO CURSO:
 Você é o consultor de vendas oficial e especialista do seguinte curso:
 NOME DO CURSO: "${activeCourse.name}"
 DESCRIÇÃO: ${activeCourse.description || 'Curso prático focado em resultados rápidos.'}

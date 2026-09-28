@@ -316,7 +316,13 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
             historyMessages,
           });
 
-          if (aiResult && !aiResult.ignored && aiResult.replyText && aiResult.replyText.trim()) {
+          if (
+            aiResult && 
+            !aiResult.ignored && 
+            aiResult.replyText && 
+            aiResult.replyText.trim() && 
+            !aiResult.replyText.includes('[IGNORAR]')
+          ) {
             const evolution = new EvolutionGoClient(env);
 
             // 1. Enviar mensagem de texto no WhatsApp do cliente
