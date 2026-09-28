@@ -1,508 +1,518 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Send, 
   CheckCheck, 
-  Pause, 
   Play, 
+  Pause,
   RotateCcw, 
   FileText, 
-  Sparkles, 
-  CreditCard, 
-  Copy, 
-  Check, 
-  Gift, 
   Mic, 
+  Code2, 
+  Terminal, 
+  Check, 
+  Copy, 
   Zap, 
-  Bot, 
+  Webhook, 
+  ArrowRight,
+  ExternalLink,
   ShieldCheck,
-  PackageCheck
+  Smartphone
 } from 'lucide-react';
 
-interface DemoMessage {
+interface EndpointDemo {
   id: string;
-  from: 'customer' | 'bot';
-  text: string;
-  media?: {
-    type: 'pdf' | 'audio' | 'pix' | 'bonus';
-    name?: string;
-    sub?: string;
-    code?: string;
+  name: string;
+  method: string;
+  path: string;
+  badge: string;
+  badgeColor: string;
+  requestSnippet: {
+    curl: string;
+    js: string;
+    python: string;
+  };
+  responseJson: string;
+  latencyMs: number;
+  phoneMessage: {
+    type: 'text' | 'audio' | 'media';
+    text?: string;
+    mediaName?: string;
+    mediaSub?: string;
+    audioDuration?: string;
   };
 }
 
-interface Frame {
-  messages: DemoMessage[];
-  typing: 'customer' | 'bot' | null;
-  stageName: string;
-  stageColor: string;
-  caption: string;
-  duration: number;
-}
+const ENDPOINTS: EndpointDemo[] = [
+  {
+    id: 'text',
+    name: 'Envio de Texto',
+    method: 'POST',
+    path: '/api/messages/send-text',
+    badge: 'Mais Utilizado',
+    badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    requestSnippet: {
+      curl: `curl -X POST https://api.nexusapi.com.br/api/messages/send-text \\
+  -H "Authorization: Bearer nx_live_sec_987654321" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "number": "5511999998888",
+    "text": "Olá, Marcelo! 👋 Sua fatura #8429 vence hoje. Acesse o boleto em: https://nexus.com.br/f/8429"
+  }'`,
+      js: `await fetch('https://api.nexusapi.com.br/api/messages/send-text', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer nx_live_sec_987654321',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    number: '5511999998888',
+    text: 'Olá, Marcelo! 👋 Sua fatura #8429 vence hoje. Acesse o boleto em: https://nexus.com.br/f/8429'
+  })
+});`,
+      python: `import requests
 
-const FRAMES: Frame[] = [
-  {
-    messages: [],
-    typing: 'customer',
-    stageName: 'Aguardando Mensagem',
-    stageColor: 'text-slate-400 border-slate-700 bg-slate-800/40',
-    caption: '1. O lead chega pelo anúncio ou link da bio e manda mensagem no seu WhatsApp.',
-    duration: 1500,
+res = requests.post(
+  "https://api.nexusapi.com.br/api/messages/send-text",
+  headers={"Authorization": "Bearer nx_live_sec_987654321"},
+  json={
+    "number": "5511999998888",
+    "text": "Olá, Marcelo! 👋 Sua fatura #8429 vence hoje. Acesse o boleto em: https://nexus.com.br/f/8429"
+  }
+)
+print(res.json())`
+    },
+    responseJson: `{\n  "status": "success",\n  "messageId": "3EB09F8C_719A4B",\n  "timestamp": "2026-09-28T16:30:15Z",\n  "recipient": "5511999998888",\n  "status": "delivered"\n}`,
+    latencyMs: 112,
+    phoneMessage: {
+      type: 'text',
+      text: 'Olá, Marcelo! 👋 Sua fatura #8429 vence hoje. Acesse o boleto em: https://nexus.com.br/f/8429',
+    },
   },
   {
-    messages: [
-      {
-        id: '1',
-        from: 'customer',
-        text: 'Olá! Gostaria de saber mais sobre o curso de Fórmulas Profissionais.',
-      },
-    ],
-    typing: 'bot',
-    stageName: 'Etapa 1: Voto de Confiança',
-    stageColor: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10',
-    caption: '2. O Bot NexusAPI (GPT-5.6) responde em <1s com a oferta e a proposta de confiança.',
-    duration: 2200,
+    id: 'audio',
+    name: 'Áudio PTT (Voz Gravada)',
+    method: 'POST',
+    path: '/api/messages/send-audio',
+    badge: 'Microfone Verde PTT',
+    badgeColor: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
+    requestSnippet: {
+      curl: `curl -X POST https://api.nexusapi.com.br/api/messages/send-audio \\
+  -H "Authorization: Bearer nx_live_sec_987654321" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "number": "5511999998888",
+    "audioUrl": "https://storage.nexus.com.br/audios/confirmacao.mp3",
+    "ptt": true
+  }'`,
+      js: `await fetch('https://api.nexusapi.com.br/api/messages/send-audio', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer nx_live_sec_987654321',
+    'Content-Type': 'application/json'
   },
-  {
-    messages: [
-      {
-        id: '1',
-        from: 'customer',
-        text: 'Olá! Gostaria de saber mais sobre o curso de Fórmulas Profissionais.',
-      },
-      {
-        id: '2',
-        from: 'bot',
-        text: 'Olá, Carlos! 😊 O curso ensina a produzir produtos de limpeza profissionais com alta margem de lucro. De R$ 149,99 hoje por apenas R$ 9,99.\n\nMas olha: eu confio tanto no conteúdo que vou te mandar tudo agora mesmo antes de pagar! Posso te enviar o material?',
-        media: {
-          type: 'audio',
-          name: 'Áudio gravado da apresentação',
-          sub: '0:22 • Microfone verde PTT',
-        },
-      },
-    ],
-    typing: 'customer',
-    stageName: 'Etapa 1: Aguardando Aceite',
-    stageColor: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10',
-    caption: '3. A barreira de desconfiança é quebrada. O cliente aceita receber o conteúdo.',
-    duration: 2000,
-  },
-  {
-    messages: [
-      {
-        id: '1',
-        from: 'customer',
-        text: 'Olá! Gostaria de saber mais sobre o curso de Fórmulas Profissionais.',
-      },
-      {
-        id: '2',
-        from: 'bot',
-        text: 'Olá, Carlos! 😊 O curso ensina a produzir produtos de limpeza profissionais com alta margem de lucro. De R$ 149,99 hoje por apenas R$ 9,99.\n\nMas olha: eu confio tanto no conteúdo que vou te mandar tudo agora mesmo antes de pagar! Posso te enviar o material?',
-        media: {
-          type: 'audio',
-          name: 'Áudio gravado da apresentação',
-          sub: '0:22 • Microfone verde PTT',
-        },
-      },
-      {
-        id: '3',
-        from: 'customer',
-        text: 'Sim, pode mandar por favor!',
-      },
-    ],
-    typing: 'bot',
-    stageName: 'Etapa 2: Entrega de Material + PIX',
-    stageColor: 'text-teal-400 border-teal-500/30 bg-teal-500/10',
-    caption: '4. O robô dispara as apostilas, o PIX Copia e Cola avulso e a isca do Super Bônus.',
-    duration: 2500,
-  },
-  {
-    messages: [
-      {
-        id: '1',
-        from: 'customer',
-        text: 'Olá! Gostaria de saber mais sobre o curso de Fórmulas Profissionais.',
-      },
-      {
-        id: '2',
-        from: 'bot',
-        text: 'Olá, Carlos! 😊 O curso ensina a produzir produtos de limpeza profissionais com alta margem de lucro. De R$ 149,99 hoje por apenas R$ 9,99.\n\nMas olha: eu confio tanto no conteúdo que vou te mandar tudo agora mesmo antes de pagar! Posso te enviar o material?',
-        media: {
-          type: 'audio',
-          name: 'Áudio gravado da apresentação',
-          sub: '0:22 • Microfone verde PTT',
-        },
-      },
-      {
-        id: '3',
-        from: 'customer',
-        text: 'Sim, pode mandar por favor!',
-      },
-      {
-        id: '4',
-        from: 'bot',
-        text: 'Maravilha! Já estou liberando o material completo acima para você 🚀\n\nConforme combinamos, aqui estão os dados do PIX (R$ 9,99). Copie a chave abaixo:',
-        media: {
-          type: 'pdf',
-          name: 'Apostila_Formulas_Profissionais_50L.pdf',
-          sub: '14.2 MB • Acesso Completo',
-        },
-      },
-      {
-        id: '5',
-        from: 'bot',
-        text: '00020126580014br.gov.bcb.pix0136nexus-api-pagamentos...54049.995802BR',
-        media: {
-          type: 'pix',
-          name: 'PIX Copia e Cola Oficial',
-          code: '00020126580014br.gov.bcb.pix0136nexus-api-pagamentos...54049.995802BR',
-        },
-      },
-    ],
-    typing: 'customer',
-    stageName: 'Etapa 2: Aguardando Pagamento',
-    stageColor: 'text-teal-400 border-teal-500/30 bg-teal-500/10',
-    caption: '5. O cliente copia o PIX num toque no celular, paga e envia a confirmação.',
-    duration: 2500,
-  },
-  {
-    messages: [
-      {
-        id: '1',
-        from: 'customer',
-        text: 'Olá! Gostaria de saber mais sobre o curso de Fórmulas Profissionais.',
-      },
-      {
-        id: '2',
-        from: 'bot',
-        text: 'Olá, Carlos! 😊 O curso ensina a produzir produtos de limpeza profissionais com alta margem de lucro. De R$ 149,99 hoje por apenas R$ 9,99.\n\nMas olha: eu confio tanto no conteúdo que vou te mandar tudo agora mesmo antes de pagar! Posso te enviar o material?',
-        media: {
-          type: 'audio',
-          name: 'Áudio gravado da apresentação',
-          sub: '0:22 • Microfone verde PTT',
-        },
-      },
-      {
-        id: '3',
-        from: 'customer',
-        text: 'Sim, pode mandar por favor!',
-      },
-      {
-        id: '4',
-        from: 'bot',
-        text: 'Maravilha! Já estou liberando o material completo acima para você 🚀\n\nConforme combinamos, aqui estão os dados do PIX (R$ 9,99). Copie a chave abaixo:',
-        media: {
-          type: 'pdf',
-          name: 'Apostila_Formulas_Profissionais_50L.pdf',
-          sub: '14.2 MB • Acesso Completo',
-        },
-      },
-      {
-        id: '5',
-        from: 'bot',
-        text: '00020126580014br.gov.bcb.pix0136nexus-api-pagamentos...54049.995802BR',
-        media: {
-          type: 'pix',
-          name: 'PIX Copia e Cola Oficial',
-          code: '00020126580014br.gov.bcb.pix0136nexus-api-pagamentos...54049.995802BR',
-        },
-      },
-      {
-        id: '6',
-        from: 'customer',
-        text: 'Pronto, acabei de fazer o PIX! Segue o comprovante 💳',
-      },
-      {
-        id: '7',
-        from: 'bot',
-        text: 'Sensacional, Carlos! Pagamento confirmado com sucesso! Muito obrigado pela sua integridade! 👏🎉\n\nAqui está o seu SUPER BÔNUS EXCLUSIVO:',
-        media: {
-          type: 'bonus',
-          name: 'Guia_Secreto_Fornecedores_70off.pdf',
-          sub: 'Super Bônus Liberado • R$ 47,00 Grátis',
-        },
-      },
-    ],
-    typing: null,
-    stageName: 'Etapa 3: Venda Concluída + Bônus Liberado',
-    stageColor: 'text-purple-400 border-purple-500/30 bg-purple-500/10',
-    caption: '6. Venda concluída 100% no automático, sem precisar de nenhum atendente humano.',
-    duration: 4500,
-  },
-];
+  body: JSON.stringify({
+    number: '5511999998888',
+    audioUrl: 'https://storage.nexus.com.br/audios/confirmacao.mp3',
+    ptt: true // Envia com microfone verde como se gravado na hora
+  })
+});`,
+      python: `import requests
 
-const CHAPTERS = [
-  { label: '1. Voto de Confiança', frame: 1 },
-  { label: '2. Entrega + PIX', frame: 3 },
-  { label: '3. Pagamento & Bônus', frame: 5 },
+res = requests.post(
+  "https://api.nexusapi.com.br/api/messages/send-audio",
+  headers={"Authorization": "Bearer nx_live_sec_987654321"},
+  json={
+    "number": "5511999998888",
+    "audioUrl": "https://storage.nexus.com.br/audios/confirmacao.mp3",
+    "ptt": True
+  }
+)
+print(res.json())`
+    },
+    responseJson: `{\n  "status": "success",\n  "messageId": "3EB029AC_912B8C",\n  "type": "audio/ogg; codecs=opus",\n  "durationSeconds": 34,\n  "ptt": true,\n  "status": "sent"\n}`,
+    latencyMs: 145,
+    phoneMessage: {
+      type: 'audio',
+      text: 'Áudio explicativo enviado como gravação de voz na hora.',
+      audioDuration: '0:34',
+    },
+  },
+  {
+    id: 'media',
+    name: 'Disparo de PDFs & Mídias',
+    method: 'POST',
+    path: '/api/messages/send-media',
+    badge: 'Arquivos & Documentos',
+    badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+    requestSnippet: {
+      curl: `curl -X POST https://api.nexusapi.com.br/api/messages/send-media \\
+  -H "Authorization: Bearer nx_live_sec_987654321" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "number": "5511999998888",
+    "mediaUrl": "https://storage.nexus.com.br/docs/proposta_2026.pdf",
+    "fileName": "Proposta_Comercial_Nexus.pdf",
+    "caption": "Segue em anexo a proposta comercial solicitada 📄"
+  }'`,
+      js: `await fetch('https://api.nexusapi.com.br/api/messages/send-media', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer nx_live_sec_987654321',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    number: '5511999998888',
+    mediaUrl: 'https://storage.nexus.com.br/docs/proposta_2026.pdf',
+    fileName: 'Proposta_Comercial_Nexus.pdf',
+    caption: 'Segue em anexo a proposta comercial solicitada 📄'
+  })
+});`,
+      python: `import requests
+
+res = requests.post(
+  "https://api.nexusapi.com.br/api/messages/send-media",
+  headers={"Authorization": "Bearer nx_live_sec_987654321"},
+  json={
+    "number": "5511999998888",
+    "mediaUrl": "https://storage.nexus.com.br/docs/proposta_2026.pdf",
+    "fileName": "Proposta_Comercial_Nexus.pdf",
+    "caption": "Segue em anexo a proposta comercial solicitada 📄"
+  }
+)
+print(res.json())`
+    },
+    responseJson: `{\n  "status": "success",\n  "messageId": "3EB0481F_113A7E",\n  "mediaType": "document",\n  "fileName": "Proposta_Comercial_Nexus.pdf",\n  "fileSize": "1.4 MB",\n  "status": "delivered"\n}`,
+    latencyMs: 168,
+    phoneMessage: {
+      type: 'media',
+      mediaName: 'Proposta_Comercial_Nexus.pdf',
+      mediaSub: '1.4 MB • Documento PDF',
+      text: 'Segue em anexo a proposta comercial solicitada 📄',
+    },
+  },
+  {
+    id: 'webhook',
+    name: 'Webhooks em Tempo Real',
+    method: 'EVENT',
+    path: 'https://seu-sistema.com/webhook',
+    badge: 'Disparo < 50ms',
+    badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+    requestSnippet: {
+      curl: `# Payload JSON que o seu servidor ou n8n recebe automaticamente:
+{
+  "event": "messages.upsert",
+  "instance": "instancia_vendas_01",
+  "data": {
+    "key": {
+      "remoteJid": "5511999998888@s.whatsapp.net",
+      "fromMe": false,
+      "id": "3EB09F8C719A4B"
+    },
+    "pushName": "Marcelo Silva",
+    "message": {
+      "conversation": "Olá! Gostaria de fechar o plano Pro."
+    },
+    "messageTimestamp": 1790209420
+  }
+}`,
+      js: `// Exemplo de receptor no Node.js / Express:
+app.post('/webhook', (req, res) => {
+  const { event, data } = req.body;
+  if (event === 'messages.upsert') {
+    const sender = data.key.remoteJid;
+    const text = data.message?.conversation;
+    console.log(\`Mensagem de \${sender}: \${text}\`);
+  }
+  res.status(200).send('OK');
+});`,
+      python: `# Exemplo de receptor em Python (FastAPI / Flask):
+@app.post("/webhook")
+async def receive_webhook(payload: dict):
+    if payload.get("event") == "messages.upsert":
+        data = payload.get("data", {})
+        sender = data.get("key", {}).get("remoteJid")
+        text = data.get("message", {}).get("conversation")
+        print(f"Mensagem de {sender}: {text}")
+    return {"status": "ok"}`
+    },
+    responseJson: `{\n  "event": "messages.upsert",\n  "status": "delivered_to_webhook",\n  "deliveredAt": "2026-09-28T16:30:15.042Z",\n  "statusCode": 200,\n  "durationMs": 38\n}`,
+    latencyMs: 38,
+    phoneMessage: {
+      type: 'text',
+      text: 'Olá! Gostaria de fechar o plano Pro. Vocês aceitam PIX ou Cartão?',
+    },
+  },
 ];
 
 export const HeroDemo: React.FC = () => {
-  const [frameIndex, setFrameIndex] = useState(0);
-  const [playing, setPlaying] = useState(true);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [lang, setLang] = useState<'curl' | 'js' | 'python'>('curl');
   const [copied, setCopied] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [triggerPulse, setTriggerPulse] = useState(false);
 
+  const current = ENDPOINTS[activeIndex];
+
+  // Alterna automaticamente os endpoints a cada 6 segundos se estiver em autoplay
   useEffect(() => {
-    const el = rootRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { threshold: 0.2 });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+    if (!isPlaying) return;
+    const interval = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % ENDPOINTS.length);
+      setTriggerPulse(true);
+      setTimeout(() => setTriggerPulse(false), 800);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [isPlaying]);
 
-  useEffect(() => {
-    if (!playing || !visible) return;
-    const timer = setTimeout(() => {
-      setFrameIndex((i) => (i + 1) % FRAMES.length);
-    }, FRAMES[frameIndex].duration);
-    return () => clearTimeout(timer);
-  }, [frameIndex, playing, visible]);
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(current.requestSnippet[lang]);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
-  const frame = FRAMES[frameIndex];
-
-  const handleCopy = (code?: string) => {
-    if (code) {
-      navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+  const handleManualTest = () => {
+    setIsExecuting(true);
+    setTriggerPulse(true);
+    setTimeout(() => {
+      setIsExecuting(false);
+      setTimeout(() => setTriggerPulse(false), 800);
+    }, 600);
   };
 
   return (
-    <div ref={rootRef} className="w-full max-w-4xl mx-auto">
-      {/* Container Principal Estilo Device Frame com Glow */}
-      <div className="relative rounded-3xl p-1 bg-gradient-to-b from-emerald-500/30 via-slate-800/40 to-slate-900/60 shadow-2xl shadow-emerald-950/50 backdrop-blur-xl">
-        <div className="bg-[#0b0f19] rounded-[22px] border border-slate-800/80 overflow-hidden flex flex-col md:flex-row">
-          
-          {/* Lado Esquerdo: Chat ao vivo do WhatsApp */}
-          <div className="flex-1 flex flex-col border-b md:border-b-0 md:border-r border-slate-800/80">
-            {/* Header do WhatsApp Mockup */}
-            <div className="px-4 py-3 bg-[#111726] border-b border-slate-800/80 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-slate-950 font-bold shadow-md">
-                    <Bot className="w-5 h-5 text-slate-950" />
-                  </div>
-                  <span className="w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#111726] absolute bottom-0 right-0 animate-pulse" />
+    <div className="w-full max-w-6xl mx-auto rounded-3xl bg-[#0f1424]/90 border border-slate-800 shadow-2xl overflow-hidden backdrop-blur-xl transition-all">
+      {/* Barra de Controles de Endpoints do Topo */}
+      <div className="p-4 sm:p-5 border-b border-slate-800/80 bg-[#141b2e]/60 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none w-full sm:w-auto">
+          {ENDPOINTS.map((ep, idx) => (
+            <button
+              key={ep.id}
+              type="button"
+              onClick={() => {
+                setActiveIndex(idx);
+                setIsPlaying(false);
+                handleManualTest();
+              }}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
+                activeIndex === idx
+                  ? 'bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/20 scale-[1.02]'
+                  : 'bg-slate-900/80 text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800'
+              }`}
+            >
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-bold ${
+                activeIndex === idx ? 'bg-slate-950/30 text-slate-950' : 'bg-slate-800 text-emerald-400'
+              }`}>
+                {ep.method}
+              </span>
+              <span>{ep.name}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-slate-400 w-full sm:w-auto justify-between sm:justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60">
+          <button
+            type="button"
+            onClick={() => setIsPlaying(!isPlaying)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 transition-colors border border-slate-800 text-[11px]"
+            title={isPlaying ? 'Pausar demonstração automática' : 'Retomar rotação automática'}
+          >
+            {isPlaying ? <Pause className="w-3.5 h-3.5 text-amber-400" /> : <Play className="w-3.5 h-3.5 text-emerald-400" />}
+            <span>{isPlaying ? 'Pausar Tour' : 'Tour Automático'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleManualTest}
+            disabled={isExecuting}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30 font-bold transition-all text-[11px] shadow-sm active:scale-95"
+          >
+            <Zap className={`w-3.5 h-3.5 text-emerald-400 ${isExecuting ? 'animate-spin' : ''}`} />
+            <span>{isExecuting ? 'Disparando...' : 'Testar Requisição'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Grid Principal: Terminal de Código à Esquerda + Visualizador WhatsApp à Direita */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[480px]">
+        {/* Terminal do Desenvolvedor (7 Colunas) */}
+        <div className="lg:col-span-7 p-5 sm:p-6 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-slate-800/80 bg-[#0d1220]/70 font-mono text-xs">
+          <div>
+            {/* Header do Editor de Código */}
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-800/80">
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
                 </div>
-                <div>
-                  <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                    NexusAPI Bot • Atendente IA
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">GPT-5.6</span>
-                  </h4>
-                  <p className="text-[10px] text-emerald-400 flex items-center gap-1">
-                    <span>Online agora</span> • <span>Responde em 0.8s</span>
-                  </p>
-                </div>
+                <span className="text-[11px] text-slate-400 font-sans ml-2 font-medium">
+                  {current.path}
+                </span>
               </div>
 
-              {/* Status do Funil */}
-              <div className={`px-2.5 py-1 rounded-full border text-[10px] font-bold ${frame.stageColor} transition-all`}>
-                {frame.stageName}
+              {/* Seletor de Linguagem */}
+              <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-lg border border-slate-800 font-sans">
+                {(['curl', 'js', 'python'] as const).map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => setLang(l)}
+                    className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase transition-all ${
+                      lang === l ? 'bg-emerald-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {l === 'curl' ? 'cURL' : l === 'js' ? 'Node' : 'Python'}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={handleCopyCode}
+                  className="ml-1 p-1 text-slate-400 hover:text-white transition-colors"
+                  title="Copiar código"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
               </div>
             </div>
 
-            {/* Feed de Mensagens */}
-            <div className="p-4 space-y-3.5 h-[420px] overflow-y-auto bg-[#080c14]/90 flex flex-col">
-              {frame.messages.map((m) => {
-                const isCustomer = m.from === 'customer';
-                return (
-                  <div
-                    key={m.id}
-                    className={`flex flex-col ${isCustomer ? 'items-end' : 'items-start'} animate-fadeIn`}
-                  >
-                    <div
-                      className={`max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed shadow-md ${
-                        isCustomer
-                          ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-tr-none'
-                          : 'bg-[#151c2e] border border-slate-800 text-slate-200 rounded-tl-none space-y-2'
-                      }`}
-                    >
-                      <p className="whitespace-pre-wrap font-normal">{m.text}</p>
+            {/* Código da Requisição */}
+            <div className="mt-4 p-4 rounded-2xl bg-black/60 border border-slate-900 overflow-x-auto text-[11px] leading-relaxed text-slate-200 select-all font-mono scrollbar-thin">
+              <pre className="whitespace-pre-wrap">{current.requestSnippet[lang]}</pre>
+            </div>
+          </div>
 
-                      {/* Mídia Anexa */}
-                      {m.media && (
-                        <div className="pt-2 border-t border-slate-700/50">
-                          {m.media.type === 'audio' && (
-                            <div className="p-2 rounded-xl bg-slate-900/90 border border-slate-700/80 flex items-center gap-2 text-[11px] text-emerald-300">
-                              <div className="w-6 h-6 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center flex-shrink-0">
-                                <Mic className="w-3.5 h-3.5" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-bold text-white truncate">{m.media.name}</p>
-                                <p className="text-[9px] text-emerald-400">{m.media.sub}</p>
-                              </div>
-                            </div>
-                          )}
+          {/* Resposta do Servidor em Tempo Real */}
+          <div className="mt-4 pt-3.5 border-t border-slate-800/80">
+            <div className="flex items-center justify-between text-[11px] mb-2 font-sans">
+              <span className="font-bold text-slate-400 flex items-center gap-1.5">
+                <Terminal className="w-3.5 h-3.5 text-emerald-400" /> Resposta da API:
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono font-bold">
+                  200 OK
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {current.latencyMs}ms
+                </span>
+              </div>
+            </div>
 
-                          {m.media.type === 'pdf' && (
-                            <div className="p-2 rounded-xl bg-slate-900/90 border border-slate-700/80 flex items-center gap-2 text-[11px] text-slate-200">
-                              <FileText className="w-6 h-6 text-rose-400 flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <p className="font-bold text-white truncate">{m.media.name}</p>
-                                <p className="text-[9px] text-slate-400">{m.media.sub}</p>
-                              </div>
-                              <span className="text-[9px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">
-                                Entregue
-                              </span>
-                            </div>
-                          )}
+            <div className="p-3 bg-black/40 rounded-xl border border-slate-800/60 font-mono text-[10px] text-emerald-400/90 overflow-x-auto">
+              <pre>{current.responseJson}</pre>
+            </div>
+          </div>
+        </div>
 
-                          {m.media.type === 'pix' && (
-                            <div className="p-2.5 rounded-xl bg-slate-900/95 border border-emerald-500/30 space-y-1.5">
-                              <div className="flex items-center justify-between text-[10px] font-bold text-emerald-400">
-                                <span className="flex items-center gap-1">
-                                  <CreditCard className="w-3 h-3" /> PIX COPIA E COLA:
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopy(m.media?.code)}
-                                  className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20"
-                                >
-                                  {copied ? <Check className="w-2.5 h-2.5" /> : <Copy className="w-2.5 h-2.5" />}
-                                  <span>{copied ? 'Copiado!' : 'Copiar'}</span>
-                                </button>
-                              </div>
-                              <p className="font-mono text-[9px] text-slate-400 truncate bg-black/50 p-1.5 rounded">
-                                {m.media.code}
-                              </p>
-                            </div>
-                          )}
+        {/* Simulador do WhatsApp do Destinatário (5 Colunas) */}
+        <div className="lg:col-span-5 p-5 sm:p-6 bg-[#090d18]/90 flex flex-col items-center justify-center">
+          <div className="w-full max-w-[340px] rounded-3xl bg-[#11192b] border border-slate-800 shadow-2xl overflow-hidden flex flex-col h-[460px]">
+            {/* Topbar WhatsApp */}
+            <div className="p-3 bg-[#192238] border-b border-slate-800/80 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="relative">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-slate-950 font-black text-xs shadow-md">
+                    NX
+                  </div>
+                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[#192238]" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1">
+                    <p className="text-xs font-bold text-white">NexusAPI Bot</p>
+                    <CheckCheck className="w-3 h-3 text-emerald-400" />
+                  </div>
+                  <p className="text-[10px] text-emerald-400 font-sans">online • conectado via API</p>
+                </div>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-mono">
+                OFICIAL
+              </span>
+            </div>
 
-                          {m.media.type === 'bonus' && (
-                            <div className="p-2 rounded-xl bg-purple-950/40 border border-purple-500/40 flex items-center gap-2 text-[11px] text-purple-200">
-                              <Gift className="w-6 h-6 text-purple-400 flex-shrink-0 animate-bounce" />
-                              <div className="flex-1 min-w-0">
-                                <p className="font-bold text-white truncate">{m.media.name}</p>
-                                <p className="text-[9px] text-purple-300 font-semibold">{m.media.sub}</p>
-                              </div>
-                            </div>
-                          )}
+            {/* Corpo das Mensagens do WhatsApp */}
+            <div className="flex-1 p-4 bg-[#0a0f1d] flex flex-col justify-end space-y-3 overflow-y-auto">
+              <div className="text-center">
+                <span className="px-2.5 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-[9px] text-slate-400 font-sans">
+                  Hoje • Conexão em tempo real
+                </span>
+              </div>
+
+              {/* Balão da Mensagem Recebida */}
+              <div className={`p-3.5 rounded-2xl bg-[#1b263d] border border-slate-700/60 text-slate-100 text-xs shadow-lg space-y-2 transition-all duration-300 ${
+                triggerPulse ? 'scale-[1.02] border-emerald-500/60 shadow-emerald-500/10' : ''
+              }`}>
+                {current.phoneMessage.type === 'text' && (
+                  <p className="leading-relaxed whitespace-pre-wrap select-text">
+                    {current.phoneMessage.text}
+                  </p>
+                )}
+
+                {current.phoneMessage.type === 'audio' && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 p-2 bg-slate-900/80 rounded-xl border border-slate-800">
+                      <div className="w-8 h-8 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center flex-shrink-0 shadow">
+                        <Play className="w-4 h-4 ml-0.5 fill-current" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        {/* Onda Sonora Simulada */}
+                        <div className="flex items-center gap-0.5 h-4">
+                          {[30, 60, 45, 80, 100, 65, 40, 90, 75, 50, 85, 95, 60, 40, 80, 50].map((h, i) => (
+                            <div
+                              key={i}
+                              style={{ height: `${h}%` }}
+                              className="w-1 bg-emerald-400 rounded-full"
+                            />
+                          ))}
                         </div>
-                      )}
-
-                      <div className="flex items-center justify-end gap-1 text-[9px] text-slate-400 mt-0.5">
-                        <span>Agora</span>
-                        <CheckCheck className="w-3 h-3 text-emerald-400" />
+                        <div className="flex items-center justify-between text-[9px] text-slate-400 font-mono">
+                          <span>{current.phoneMessage.audioDuration}</span>
+                          <span className="text-emerald-400 font-bold flex items-center gap-1">
+                            <Mic className="w-2.5 h-2.5 text-emerald-400" /> PTT Gravado
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                );
-              })}
+                )}
 
-              {/* Indicador de Digitação */}
-              {frame.typing && (
-                <div className={`flex ${frame.typing === 'customer' ? 'justify-end' : 'justify-start'} animate-fadeIn`}>
-                  <div className="bg-[#151c2e] border border-slate-800 rounded-2xl p-2.5 px-4 text-xs text-slate-400 flex items-center gap-1.5 shadow">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                    <span>{frame.typing === 'bot' ? 'NexusAPI está digitando...' : 'Cliente está digitando...'}</span>
+                {current.phoneMessage.type === 'media' && (
+                  <div className="space-y-2">
+                    <div className="p-2.5 bg-slate-900/90 rounded-xl border border-slate-800 flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center flex-shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-bold text-white truncate">
+                          {current.phoneMessage.mediaName}
+                        </p>
+                        <p className="text-[9px] text-slate-400 font-mono">
+                          {current.phoneMessage.mediaSub}
+                        </p>
+                      </div>
+                    </div>
+                    {current.phoneMessage.text && (
+                      <p className="text-[11px] text-slate-200 mt-1">
+                        {current.phoneMessage.text}
+                      </p>
+                    )}
                   </div>
-                </div>
-              )}
-            </div>
+                )}
 
-            {/* Barra Inferior com Legenda Explicativa da Etapa */}
-            <div className="p-3 bg-[#111726] border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-300">
-              <span className="font-medium text-[11px] text-slate-300 truncate">
-                {frame.caption}
-              </span>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setPlaying(!playing)}
-                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
-                  title={playing ? 'Pausar' : 'Play'}
-                >
-                  {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFrameIndex(0);
-                    setPlaying(true);
-                  }}
-                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
-                  title="Reiniciar"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center justify-end gap-1 text-[9px] text-slate-400 pt-1">
+                  <span>13:30</span>
+                  <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
+                </div>
+              </div>
+
+              {/* Badge de Latência */}
+              <div className="p-2 rounded-xl bg-slate-900/90 border border-slate-800/80 flex items-center justify-between text-[10px] text-slate-300">
+                <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                  <Zap className="w-3 h-3" /> Entregue via Cluster Nuvem
+                </span>
+                <span className="font-mono text-slate-400">{current.latencyMs}ms</span>
               </div>
             </div>
           </div>
-
-          {/* Lado Direito: Métricas do Motor da NexusAPI */}
-          <div className="w-full md:w-80 bg-[#0f1422] p-5 flex flex-col justify-between space-y-4">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">
-                <Zap className="w-4 h-4" />
-                <span>MOTOR DE VENDAS NEXUSAPI</span>
-              </div>
-
-              {/* Seletor de Capítulos do Funil */}
-              <div className="space-y-2">
-                <span className="text-[11px] font-semibold text-slate-400">Pular para etapa:</span>
-                <div className="grid grid-cols-1 gap-1.5">
-                  {CHAPTERS.map((ch, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        setFrameIndex(ch.frame);
-                        setPlaying(true);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-between border ${
-                        frameIndex >= ch.frame && (idx === CHAPTERS.length - 1 || frameIndex < CHAPTERS[idx + 1].frame)
-                          ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300'
-                          : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:border-slate-700'
-                      }`}
-                    >
-                      <span>{ch.label}</span>
-                      <span className="text-[10px] opacity-70">0{idx + 1}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Cards de Métricas e Recursos */}
-              <div className="space-y-2 pt-2 border-t border-slate-800/80">
-                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-400">Inteligência Artificial:</span>
-                    <span className="font-bold text-white">GPT-5.6 Luna</span>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-400">Latência Média:</span>
-                    <span className="font-bold text-emerald-400">&lt; 850ms</span>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-400">Conversão Estimada:</span>
-                    <span className="font-bold text-teal-300">Até 4x Maior</span>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 space-y-1">
-                  <p className="font-bold flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    Voto de Confiança Automático
-                  </p>
-                  <p className="text-[10px] text-slate-400 leading-snug">
-                    O robô detecta a confirmação do lead, envia os PDFs do curso na hora e dispara o PIX individual.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-slate-800/80">
-              <a
-                href="#planos"
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-bold text-xs hover:from-emerald-400 hover:to-teal-300 transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 text-center"
-              >
-                <span>Ativar no Meu WhatsApp</span>
-              </a>
-            </div>
-          </div>
-
         </div>
       </div>
     </div>
