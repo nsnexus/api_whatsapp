@@ -314,7 +314,7 @@ SEU OBJETIVO NESTE PRIMEIRO CONTATO:
         model: modelToUse,
         messages: openAiMessages,
         temperature: 0.7,
-        max_tokens: 650,
+        max_completion_tokens: 650,
       }),
     });
 
