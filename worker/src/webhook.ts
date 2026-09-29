@@ -303,9 +303,31 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
           content: m.content || '',
         }));
 
-      // Disparar o Atendente de Vendas IA (OpenAI ChatGPT)
-      if (extracted.text && extracted.type === 'text') {
+      // Disparar o Atendente de Vendas IA (OpenAI ChatGPT) para texto, imagens e comprovantes (PDF)
+      const isTextMessage = extracted.type === 'text';
+      const isMediaMessage = extracted.type === 'image' || extracted.type === 'document';
+
+      if (extracted.text && (isTextMessage || isMediaMessage)) {
         try {
+          const evolution = new EvolutionGoClient(env);
+          let mediaBase64: string | undefined;
+          let mediaMimeType: string | undefined = extracted.mimetype || undefined;
+
+          // Se for imagem ou documento (comprovante), baixa o base64 da Evolution para a IA auditar
+          if (isMediaMessage && key?.id) {
+            try {
+              const mediaRes = await evolution.getMediaBase64(instanceName, key.id);
+              if (mediaRes?.base64) {
+                mediaBase64 = mediaRes.base64;
+                if (mediaRes.mimetype) {
+                  mediaMimeType = mediaRes.mimetype;
+                }
+              }
+            } catch (mErr) {
+              console.error('Erro ao baixar mídia da Evolution para IA:', mErr);
+            }
+          }
+
           const aiResult = await generateCourseAiReply({
             supabase,
             organizationId,
@@ -314,11 +336,12 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
             customerName: contact.name || contact.push_name || undefined,
             customerPhone: cleanPhone,
             historyMessages,
+            mediaBase64,
+            mediaMimeType,
+            mediaType: extracted.type,
           });
 
           if (aiResult && !aiResult.ignored) {
-            const evolution = new EvolutionGoClient(env);
-
             // A. Se o robô disparou passos programados do Construtor de Fluxo (Flow Builder)
             if (aiResult.dispatchItems && aiResult.dispatchItems.length > 0) {
               let lastSentText = '';
@@ -424,35 +447,48 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
                   }
                   if (item.pixPayload) {
                     const pix = item.pixPayload;
+                    const pixCode = pix.brCode || pix.pixKey;
                     const pixInfoMsg = `💳 *DADOS PARA PAGAMENTO VIA PIX:*
 📚 *Curso:* ${pix.courseName}
 💰 *Valor:* R$ ${Number(pix.amount).toFixed(2)}
-👤 *Beneficiário:* ${pix.merchantName || 'Equipe do Curso'}
+👤 *Beneficiário:* ${pix.merchantName || 'NARCISO'}
 🔑 *Chave PIX:* \`${pix.pixKey}\`
 
-👇 *Código Copia e Cola oficial abaixo:*`;
+👇 *Toque no botão abaixo para copiar o código PIX:*`;
 
-                    await evolution.sendText(instanceName, {
-                      number: cleanPhone,
-                      text: pixInfoMsg,
-                    });
-                    await supabase.from('messages').insert({
-                      organization_id: organizationId,
-                      chat_id: chat.id,
-                      instance_id: instanceId,
-                      direction: 'outbound',
-                      sender_type: 'bot',
-                      type: 'text',
-                      content: pixInfoMsg,
-                      status: 'sent',
-                    });
-                    lastSentText = pixInfoMsg;
-                    await new Promise((r) => setTimeout(r, 800));
+                    try {
+                      // Dispara botão interativo nativo do WhatsApp com ação cta_copy
+                      await evolution.sendButtons(instanceName, {
+                        number: cleanPhone,
+                        title: `💳 Pagamento PIX - ${pix.courseName}`,
+                        description: pixInfoMsg,
+                        footer: 'Toque para copiar a chave PIX e pagar no banco',
+                        buttons: [
+                          {
+                            type: 'copy',
+                            displayText: 'Copiar Chave PIX',
+                            copyCode: pixCode,
+                          },
+                        ],
+                      });
 
-                    if (pix.brCode) {
+                      await supabase.from('messages').insert({
+                        organization_id: organizationId,
+                        chat_id: chat.id,
+                        instance_id: instanceId,
+                        direction: 'outbound',
+                        sender_type: 'bot',
+                        type: 'text',
+                        content: `${pixInfoMsg}\n\n[Botão: Copiar Chave PIX]`,
+                        status: 'sent',
+                      });
+                      lastSentText = pixInfoMsg;
+                      await new Promise((r) => setTimeout(r, 800));
+                    } catch (btnErr) {
+                      console.warn('Fallback: Erro ao enviar botão nativo de PIX, enviando texto:', btnErr);
                       await evolution.sendText(instanceName, {
                         number: cleanPhone,
-                        text: pix.brCode,
+                        text: pixInfoMsg,
                       });
                       await supabase.from('messages').insert({
                         organization_id: organizationId,
@@ -461,7 +497,27 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
                         direction: 'outbound',
                         sender_type: 'bot',
                         type: 'text',
-                        content: pix.brCode,
+                        content: pixInfoMsg,
+                        status: 'sent',
+                      });
+                      lastSentText = pixInfoMsg;
+                      await new Promise((r) => setTimeout(r, 800));
+                    }
+
+                    // Envia também mensagem exclusiva apenas com o código para cópia imediata com 1 toque
+                    if (pixCode) {
+                      await evolution.sendText(instanceName, {
+                        number: cleanPhone,
+                        text: pixCode,
+                      });
+                      await supabase.from('messages').insert({
+                        organization_id: organizationId,
+                        chat_id: chat.id,
+                        instance_id: instanceId,
+                        direction: 'outbound',
+                        sender_type: 'bot',
+                        type: 'text',
+                        content: pixCode,
                         status: 'sent',
                       });
                       await new Promise((r) => setTimeout(r, 800));
@@ -567,24 +623,41 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
               const pixAction = aiResult.actions.find((a) => a.type === 'pix_generated');
               if (pixAction && pixAction.payload) {
                 const pix = pixAction.payload;
+                const pixCode = pix.brCode || pix.pixKey;
                 const pixInfoMsg = `💳 *DADOS PARA PAGAMENTO VIA PIX:*
 📚 *Curso:* ${pix.courseName}
 💰 *Valor:* R$ ${Number(pix.amount).toFixed(2)}
-👤 *Beneficiário:* ${pix.merchantName || 'Equipe do Curso'}
+👤 *Beneficiário:* ${pix.merchantName || 'NARCISO'}
 🔑 *Chave PIX:* \`${pix.pixKey}\`
 
-👇 *Código Copia e Cola oficial abaixo:*`;
+👇 *Toque no botão abaixo para copiar o código PIX:*`;
 
-                await evolution.sendText(instanceName, {
-                  number: cleanPhone,
-                  text: pixInfoMsg,
-                });
+                try {
+                  await evolution.sendButtons(instanceName, {
+                    number: cleanPhone,
+                    title: `💳 Pagamento PIX - ${pix.courseName}`,
+                    description: pixInfoMsg,
+                    footer: 'Toque para copiar a chave PIX e pagar no banco',
+                    buttons: [
+                      {
+                        type: 'copy',
+                        displayText: 'Copiar Chave PIX',
+                        copyCode: pixCode,
+                      },
+                    ],
+                  });
+                } catch (btnErr) {
+                  await evolution.sendText(instanceName, {
+                    number: cleanPhone,
+                    text: pixInfoMsg,
+                  });
+                }
 
-                if (pix.brCode) {
+                if (pixCode) {
                   // Envia UMA mensagem exclusiva apenas com o código puro para o cliente só tocar e copiar
                   await evolution.sendText(instanceName, {
                     number: cleanPhone,
-                    text: pix.brCode,
+                    text: pixCode,
                   });
                 }
               }

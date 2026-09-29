@@ -91,6 +91,38 @@ export class EvolutionGoClient {
   }
 
   /**
+   * Envia Botões Interativos do WhatsApp (com suporte nativo a cta_copy para PIX, reply e url)
+   */
+  async sendButtons(instanceName: string, params: {
+    number: string;
+    title: string;
+    description: string;
+    footer?: string;
+    buttons: Array<{
+      type: 'reply' | 'copy' | 'url' | 'call' | 'pix';
+      displayText: string;
+      copyCode?: string;
+      url?: string;
+      phoneNumber?: string;
+      id?: string;
+    }>;
+  }) {
+    const cleanNumber = toEvolutionNumber(params.number);
+
+    return this.request(`/message/sendButtons/${instanceName}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        number: cleanNumber,
+        title: params.title,
+        description: params.description,
+        footer: params.footer,
+        buttons: params.buttons,
+        delay: 1200,
+      }),
+    });
+  }
+
+  /**
    * Envia Áudio do WhatsApp (com suporte a PTT - áudio gravado nativo com microfone verde)
    */
   async sendWhatsAppAudio(instanceName: string, params: {

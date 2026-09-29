@@ -248,6 +248,106 @@ function convertStepsToDispatchItems(
 }
 
 /**
+ * Auditoria de Comprovante de Pagamento PIX usando Visão Computacional da OpenAI
+ */
+export async function verifyPixReceiptWithAi(params: {
+  apiKey: string;
+  mediaBase64: string;
+  mediaMimeType?: string;
+  recipientName: string;
+  coursePrice: number;
+  courseName: string;
+}): Promise<{ isValid: boolean; reason: string; recipientFound?: string; amountFound?: number }> {
+  const { apiKey, mediaBase64, mediaMimeType, recipientName, coursePrice, courseName } = params;
+
+  let pdfText = '';
+  const isPdf = mediaMimeType?.includes('pdf');
+  if (isPdf) {
+    try {
+      const binaryStr = atob(mediaBase64);
+      const textMatches = binaryStr.match(/\(([^)]+)\)/g) || [];
+      pdfText = textMatches.map((m) => m.slice(1, -1)).join(' ');
+      if (pdfText.length < 20) {
+        pdfText = binaryStr.slice(0, 4000).replace(/[^\x20-\x7E\xC0-\xFF]/g, ' ');
+      }
+    } catch (e) {
+      console.warn('Erro ao decodificar texto do PDF:', e);
+    }
+  }
+
+  const promptText = `Você é um auditor financeiro rigoroso que analisa comprovantes de transferência PIX e pagamento no Brasil.
+Sua missão é verificar se o documento/foto enviado pelo cliente é um comprovante autêntico de PIX efetuado com sucesso.
+
+DADOS OBRIGATÓRIOS DO RECEBEDOR:
+- Nome do Favorecido/Recebedor ESPERADO: "${recipientName}" (O nome DEVE conter "NARCISO" ou "${recipientName}").
+- Valor esperado: R$ ${coursePrice.toFixed(2)} (para o curso "${courseName}").
+
+CRITÉRIOS E REGRAS RÍGIDAS DE APROVAÇÃO:
+1. Deve ser um comprovante real de transferência/PIX concluído com sucesso. Agendamento futuro NÃO é pagamento liquidado.
+2. O nome do favorecido/recebedor DEVE conter "${recipientName}" ou "NARCISO". Se o pagamento foi feito para outro beneficiário diferente, REJEITE.
+3. Se a imagem NÃO for um comprovante de pagamento (ex: for selfie, meme, print aleatório, foto de produto, comprovante ilegível ou fraudado), REJEITE.
+
+${isPdf && pdfText ? `CONTEÚDO TEXTUAL EXTRAÍDO DO PDF:\n"""\n${pdfText}\n"""\n` : ''}
+Responda EXATAMENTE um objeto JSON no seguinte formato:
+{
+  "isValid": true ou false,
+  "recipientFound": "nome identificado no comprovante ou null",
+  "amountFound": 9.99,
+  "reason": "explicação curta em português (ex: 'Comprovante válido para NARCISO no valor de R$ 9,99' ou 'O comprovante foi enviado para Fulano de Tal, não para NARCISO' ou 'A imagem não é um comprovante de PIX')"
+}`;
+
+  const userContent: any[] = [{ type: 'text', text: promptText }];
+
+  if (!isPdf && mediaBase64) {
+    userContent.push({
+      type: 'image_url',
+      image_url: {
+        url: `data:${mediaMimeType || 'image/jpeg'};base64,${mediaBase64}`,
+      },
+    });
+  }
+
+  try {
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: userContent }],
+        response_format: { type: 'json_object' },
+        max_completion_tokens: 300,
+        temperature: 0.1,
+      }),
+    });
+
+    if (resp.ok) {
+      const data: any = await resp.json();
+      const content = data?.choices?.[0]?.message?.content || '{}';
+      const parsed = JSON.parse(content);
+      return {
+        isValid: Boolean(parsed.isValid ?? parsed.is_valid),
+        reason: parsed.reason || 'Comprovante analisado.',
+        recipientFound: parsed.recipientFound || parsed.recipient_found,
+        amountFound: parsed.amountFound || parsed.amount_found,
+      };
+    } else {
+      const errText = await resp.text();
+      console.error('Erro na resposta da OpenAI na auditoria de comprovante:', resp.status, errText);
+    }
+  } catch (err) {
+    console.error('Erro ao auditar comprovante com OpenAI:', err);
+  }
+
+  return {
+    isValid: false,
+    reason: 'Não foi possível validar o comprovante automaticamente.',
+  };
+}
+
+/**
  * Motor de IA para Venda de Cursos no WhatsApp usando OpenAI ChatGPT
  */
 export async function generateCourseAiReply(params: {
@@ -259,6 +359,9 @@ export async function generateCourseAiReply(params: {
   customerPhone?: string;
   historyMessages?: Array<{ role: 'user' | 'assistant'; content: string }>;
   forceCourseId?: string;
+  mediaBase64?: string;
+  mediaMimeType?: string;
+  mediaType?: 'text' | 'image' | 'document' | 'audio' | 'video';
 }): Promise<AiReplyResult | null> {
   const {
     supabase,
@@ -269,6 +372,9 @@ export async function generateCourseAiReply(params: {
     customerPhone,
     historyMessages = [],
     forceCourseId,
+    mediaBase64,
+    mediaMimeType,
+    mediaType,
   } = params;
 
   // 1. Carregar Configurações Globais da IA
@@ -578,13 +684,45 @@ export async function generateCourseAiReply(params: {
       let nextPhaseIndex: number = 0;
       let nextWaitingFor: string = 'confirmation';
 
-      if (!funnelState) {
-        if (botSentPixOrMaterials && isPayment) {
-          // Cliente já tinha recebido o PIX anteriormente e agora confirmou pagamento -> Avança para Fase 2
+      const isInPaymentStage =
+        (funnelState && funnelState.phase === 1) ||
+        (!funnelState && botSentPixOrMaterials);
+
+      // 🔍 AUDITORIA RIGOROSA DE COMPROVANTE VIA IA (IMAGEM OU PDF)
+      if (mediaBase64 && isInPaymentStage) {
+        const audit = await verifyPixReceiptWithAi({
+          apiKey: aiSettings.openai_api_key,
+          mediaBase64,
+          mediaMimeType,
+          recipientName: activeCourse.pix_name || 'NARCISO',
+          coursePrice: Number(activeCourse.price),
+          courseName: activeCourse.name,
+        });
+
+        if (audit.isValid) {
+          // Comprovante aprovado para NARCISO! Avança para a Fase 2 (Conclusão + Super Bônus)
           targetPhaseIndex = 2;
           nextPhaseIndex = 2;
           nextWaitingFor = 'completed';
-        } else if (botSentPresentation && isConfirmation) {
+        } else {
+          // Comprovante inválido, divergente ou não direcionado a NARCISO
+          return {
+            replyText: `Recebi o documento enviado, mas após a verificação automática identifiquei o seguinte: ${audit.reason}.\n\n⚠️ *Atenção:* O PIX deve ser no valor de *R$ ${Number(activeCourse.price).toFixed(2)}* e o favorecido deve ser *NARCISO*.\n\nPor favor, confira os dados da transferência e envie o comprovante correto aqui para eu liberar seu SUPER BÔNUS EXCLUSIVO imediatamente! 🤝`,
+            actions: [],
+            courseId: activeCourse.id,
+            courseName: activeCourse.name,
+          };
+        }
+      } else if (isInPaymentStage && isPayment && !mediaBase64) {
+        // Cliente digitou "Paguei" / "Fiz o pix", mas NÃO enviou a imagem ou PDF do comprovante
+        return {
+          replyText: `Sensacional! 🎉 Para eu confirmar a baixa e liberar na hora o seu *SUPER BÔNUS EXCLUSIVO* (com as vídeo aulas práticas), por favor me envie a *foto ou PDF do comprovante do PIX* aqui na conversa! 📸🧾`,
+          actions: [],
+          courseId: activeCourse.id,
+          courseName: activeCourse.name,
+        };
+      } else if (!funnelState) {
+        if (botSentPresentation && isConfirmation) {
           // Cliente já tinha recebido a apresentação anteriormente e agora confirmou -> Avança para Fase 1
           targetPhaseIndex = 1;
           nextPhaseIndex = 1;
@@ -604,17 +742,6 @@ export async function generateCourseAiReply(params: {
           targetPhaseIndex = 1;
           nextPhaseIndex = 1;
           nextWaitingFor = 'payment';
-        } else if (isPayment) {
-          targetPhaseIndex = 2;
-          nextPhaseIndex = 2;
-          nextWaitingFor = 'completed';
-        }
-      } else if (funnelState.phase === 1) {
-        // Estava aguardando pagamento da Fase 1
-        if (isPayment) {
-          targetPhaseIndex = 2;
-          nextPhaseIndex = 2;
-          nextWaitingFor = 'completed';
         }
       }
 
@@ -715,15 +842,39 @@ REGRAS DE CONVERSAÇÃO:
 - Se o cliente solicitar atendimento humano explicitamente, inclua a tag [CHAMAR_HUMANO].
 `.trim();
 
-      const openAiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+      const openAiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: any }> = [
         { role: 'system', content: objectionSystemPrompt },
       ];
       for (const h of historyMessages.slice(-6)) {
         openAiMessages.push({ role: h.role, content: h.content });
       }
-      openAiMessages.push({ role: 'user', content: incomingText });
 
-      const modelToUse = aiSettings.openai_model || 'gpt-5.6-luna';
+      if (mediaBase64 && (!mediaMimeType || mediaMimeType.startsWith('image/'))) {
+        openAiMessages.push({
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: incomingText && incomingText !== '📷 Foto' && incomingText !== '📄 Documento'
+                ? incomingText
+                : 'O cliente enviou esta imagem com uma dúvida sobre o curso:',
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mediaMimeType || 'image/jpeg'};base64,${mediaBase64}`,
+              },
+            },
+          ],
+        });
+      } else {
+        openAiMessages.push({ role: 'user', content: incomingText });
+      }
+
+      let modelToUse = aiSettings.openai_model || 'gpt-4o-mini';
+      if (mediaBase64) {
+        modelToUse = 'gpt-4o-mini';
+      }
       const isReasoningModel =
         modelToUse.includes('gpt-5') ||
         modelToUse.includes('o1') ||
@@ -884,7 +1035,7 @@ NÃO envie o catálogo e NÃO responda nada além de: [IGNORAR]
   }
 
   // 6. Montar o array de mensagens para a API da OpenAI
-  const openAiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+  const openAiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: any }> = [
     { role: 'system', content: systemPrompt },
   ];
 
@@ -893,11 +1044,34 @@ NÃO envie o catálogo e NÃO responda nada além de: [IGNORAR]
     openAiMessages.push({ role: h.role, content: h.content });
   }
 
-  // Adicionar a mensagem atual recebida
-  openAiMessages.push({ role: 'user', content: incomingText });
+  // Adicionar a mensagem atual recebida (com suporte a imagem)
+  if (mediaBase64 && (!mediaMimeType || mediaMimeType.startsWith('image/'))) {
+    openAiMessages.push({
+      role: 'user',
+      content: [
+        {
+          type: 'text',
+          text: incomingText && incomingText !== '📷 Foto' && incomingText !== '📄 Documento'
+            ? incomingText
+            : 'O cliente enviou esta imagem com uma dúvida:',
+        },
+        {
+          type: 'image_url',
+          image_url: {
+            url: `data:${mediaMimeType || 'image/jpeg'};base64,${mediaBase64}`,
+          },
+        },
+      ],
+    });
+  } else {
+    openAiMessages.push({ role: 'user', content: incomingText });
+  }
 
   // 7. Chamada à API da OpenAI (ChatGPT)
-  const modelToUse = aiSettings.openai_model || 'gpt-5.6-luna';
+  let modelToUse = aiSettings.openai_model || 'gpt-4o-mini';
+  if (mediaBase64) {
+    modelToUse = 'gpt-4o-mini';
+  }
   const isReasoningModel =
     modelToUse.includes('gpt-5') ||
     modelToUse.includes('o1') ||
@@ -909,7 +1083,6 @@ NÃO envie o catálogo e NÃO responda nada além de: [IGNORAR]
     max_completion_tokens: 650,
   };
 
-  // Modelos clássicos (GPT-4o, GPT-4o-mini) aceitam temperature; modelos de raciocínio (GPT-5.6, o1, o3) gerenciam internamente
   if (!isReasoningModel) {
     requestPayload.temperature = 0.7;
   }
