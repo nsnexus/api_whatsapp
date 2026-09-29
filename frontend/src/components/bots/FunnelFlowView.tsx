@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Workflow, 
   Sparkles, 
@@ -30,9 +30,14 @@ import {
   ExternalLink,
   Layers,
   Info,
-  Package
+  Package,
+  UploadCloud,
+  Loader2,
+  Camera,
+  Link as LinkIcon
 } from 'lucide-react';
 import { Course, FlowStep, FlowStepType } from '../../types';
+import { supabase } from '../../lib/supabase';
 
 interface FunnelFlowViewProps {
   courses: Course[];
@@ -164,6 +169,394 @@ const TEMPLATES: Record<string, { name: string; description: string; steps: Flow
       },
     ],
   },
+};
+
+interface StepMediaUploaderProps {
+  step: FlowStep;
+  mediaType: 'image' | 'video' | 'audio';
+  onUpdate: (data: Partial<FlowStep>) => void;
+  organizationId?: string;
+}
+
+const StepMediaUploader: React.FC<StepMediaUploaderProps> = ({
+  step,
+  mediaType,
+  onUpdate,
+  organizationId,
+}) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showManualUrl, setShowManualUrl] = useState(false);
+
+  const config = useMemo(() => {
+    switch (mediaType) {
+      case 'image':
+        return {
+          accept: 'image/*',
+          btnTitle: 'Tirar Foto ou Escolher da Galeria',
+          emptyTitle: 'Subir Foto do Celular ou Computador',
+          emptyDesc: 'Toque para abrir a câmera ou escolher foto da galeria (JPG, PNG, WebP)',
+          icon: ImageIcon,
+          colorClass: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/10',
+          badgeText: 'Foto Anexada',
+          placeholder: 'https://exemplo.com/foto-do-produto.jpg',
+          label: 'URL da Imagem / Foto:',
+        };
+      case 'video':
+        return {
+          accept: 'video/mp4,video/quicktime,video/webm,video/*',
+          btnTitle: 'Gravar ou Escolher Vídeo do Celular',
+          emptyTitle: 'Subir Vídeo do Celular ou Computador',
+          emptyDesc: 'Toque para escolher vídeo da galeria ou gravar (MP4, MOV, máx 50MB)',
+          icon: Video,
+          colorClass: 'text-purple-400 border-purple-500/30 bg-purple-500/10',
+          badgeText: 'Vídeo Carregado',
+          placeholder: 'https://exemplo.com/demonstracao.mp4',
+          label: 'URL do Vídeo (.mp4):',
+        };
+      case 'audio':
+        return {
+          accept: 'audio/mpeg,audio/ogg,audio/wav,audio/mp4,audio/m4a,audio/*',
+          btnTitle: 'Gravar ou Escolher Áudio do Celular',
+          emptyTitle: 'Subir Áudio de Voz do Celular',
+          emptyDesc: 'Toque para escolher gravação de voz ou arquivo de áudio (MP3, OGG, M4A)',
+          icon: Mic,
+          colorClass: 'text-teal-400 border-teal-500/30 bg-teal-500/10',
+          badgeText: 'Áudio PTT de Voz',
+          placeholder: 'https://exemplo.com/audio-explicativo.ogg',
+          label: 'URL do Arquivo de Áudio (.ogg / .mp3):',
+        };
+    }
+  }, [mediaType]);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const maxSize = mediaType === 'video' ? 50 * 1024 * 1024 : 20 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setUploadError(`Arquivo muito grande! O limite é ${mediaType === 'video' ? '50MB' : '20MB'}.`);
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(`Enviando ${file.name}...`);
+    setUploadError(null);
+
+    try {
+      const cleanFileName = file.name
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9._-]/g, '_');
+
+      const orgFolder = organizationId || 'geral';
+      const filePath = `${orgFolder}/flow_${Date.now()}_${cleanFileName}`;
+
+      const { error } = await supabase.storage
+        .from('course-materials')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (error) {
+        console.error('Erro no Supabase Storage:', error);
+        throw error;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('course-materials')
+        .getPublicUrl(filePath);
+
+      onUpdate({ content: publicUrl });
+    } catch (err: any) {
+      console.error('Erro de upload:', err);
+      setUploadError(err.message || 'Erro ao subir arquivo. Tente novamente.');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress('');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const IconComp = config.icon;
+
+  return (
+    <div className="space-y-3">
+      {/* Input nativo invisível com suporte a câmera/galeria no celular */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={config.accept}
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
+      {/* Se ainda não tem arquivo nem URL */}
+      {!step.content ? (
+        <div className="space-y-2">
+          <div
+            onClick={() => !isUploading && fileInputRef.current?.click()}
+            className={`cursor-pointer rounded-2xl border-2 border-dashed transition-all p-5 flex flex-col items-center justify-center text-center gap-3 group ${
+              isUploading 
+                ? 'border-emerald-500/50 bg-emerald-950/20' 
+                : 'border-slate-800 hover:border-slate-600 bg-slate-950/40 hover:bg-slate-900/40'
+            }`}
+          >
+            {isUploading ? (
+              <div className="flex flex-col items-center gap-2 py-2">
+                <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+                <span className="text-xs text-emerald-300 font-medium">{uploadProgress}</span>
+                <span className="text-[10px] text-slate-400">Gravando no storage com link seguro...</span>
+              </div>
+            ) : (
+              <>
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 shadow-lg ${config.colorClass}`}>
+                  <UploadCloud className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs font-bold text-slate-200 flex items-center justify-center gap-2">
+                    <span>{config.btnTitle}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 max-w-sm">
+                    {config.emptyDesc}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="mt-1 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-slate-950 font-bold text-xs shadow-md shadow-emerald-900/30 flex items-center gap-2 transition-all active:scale-95"
+                >
+                  <IconComp className="w-4 h-4" />
+                  <span>Escolher do Celular / PC</span>
+                </button>
+              </>
+            )}
+          </div>
+
+          {uploadError && (
+            <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{uploadError}</span>
+            </div>
+          )}
+
+          {/* Opção alternativa de colar link manual */}
+          <div className="pt-1">
+            {!showManualUrl ? (
+              <button
+                type="button"
+                onClick={() => setShowManualUrl(true)}
+                className="text-[11px] text-slate-500 hover:text-slate-400 flex items-center gap-1.5 transition-colors"
+              >
+                <LinkIcon className="w-3 h-3" />
+                <span>Ou prefere colar uma URL / link da internet?</span>
+              </button>
+            ) : (
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    {config.label}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowManualUrl(false)}
+                    className="text-[10px] text-slate-500 hover:text-slate-300"
+                  >
+                    Ocultar
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={step.content || ''}
+                  onChange={(e) => onUpdate({ content: e.target.value })}
+                  className="w-full bg-[#111726] border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-200 outline-none focus:border-emerald-500 transition-all font-mono"
+                  placeholder={config.placeholder}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* Quando JÁ possui mídia vinculada */
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-3">
+            {mediaType === 'image' && (
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+                <div className="relative group/img flex-shrink-0">
+                  <img
+                    src={step.content}
+                    alt="Preview"
+                    className="w-32 h-32 sm:w-28 sm:h-28 object-cover rounded-xl border border-slate-700 shadow-lg bg-slate-900"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                    }}
+                  />
+                  <a
+                    href={step.content}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute inset-0 bg-black/60 opacity-0 group-hover/img:opacity-100 rounded-xl flex items-center justify-center text-white transition-opacity"
+                    title="Ver em tamanho original"
+                  >
+                    <ExternalLink className="w-5 h-5" />
+                  </a>
+                </div>
+                <div className="flex-1 w-full space-y-2 text-center sm:text-left">
+                  <div className="flex items-center justify-center sm:justify-start gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Foto Carregada
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-mono break-all line-clamp-1">
+                    {step.content}
+                  </p>
+                  <div className="flex items-center justify-center sm:justify-start gap-2 pt-1 flex-wrap">
+                    <button
+                      type="button"
+                      disabled={isUploading}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                    >
+                      {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+                      <span>Trocar Foto</span>
+                    </button>
+                    <a
+                      href={step.content}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-xs font-medium flex items-center gap-1.5 transition-all"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" /> Ver Grande
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => onUpdate({ content: '' })}
+                      className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Remover
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {mediaType === 'video' && (
+              <div className="space-y-3">
+                <video
+                  src={step.content}
+                  controls
+                  className="w-full max-h-56 rounded-xl bg-black border border-slate-800"
+                />
+                <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Vídeo Carregado
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isUploading}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                    >
+                      {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Video className="w-3.5 h-3.5" />}
+                      <span>Trocar Vídeo</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onUpdate({ content: '' })}
+                      className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Remover
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {mediaType === 'audio' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-teal-500/10 text-teal-300 border border-teal-500/20">
+                    <Mic className="w-3.5 h-3.5" /> Áudio PTT Pronto (Voz Gravada)
+                  </span>
+                  <span className="text-[10px] text-slate-500">Reproduzir para testar 👇</span>
+                </div>
+                <audio
+                  src={step.content}
+                  controls
+                  className="w-full h-10 rounded-lg outline-none"
+                />
+                <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
+                  <p className="text-[10px] text-teal-400/90">
+                    💡 O WhatsApp entregará esse áudio como mensagem de voz gravada na hora (microfone verde).
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isUploading}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                    >
+                      {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mic className="w-3.5 h-3.5" />}
+                      <span>Trocar Áudio</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onUpdate({ content: '' })}
+                      className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Remover
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Opção de ver/editar o link direto */}
+          <div>
+            {!showManualUrl ? (
+              <button
+                type="button"
+                onClick={() => setShowManualUrl(true)}
+                className="text-[10px] text-slate-500 hover:text-slate-400 flex items-center gap-1"
+              >
+                <LinkIcon className="w-3 h-3" />
+                <span>Ver / editar link direto do arquivo</span>
+              </button>
+            ) : (
+              <div className="space-y-1 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] text-slate-400 font-mono">
+                    URL pública no Storage:
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowManualUrl(false)}
+                    className="text-[10px] text-slate-500 hover:text-slate-300"
+                  >
+                    Fechar
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={step.content || ''}
+                  onChange={(e) => onUpdate({ content: e.target.value })}
+                  className="w-full bg-[#111726] border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 outline-none focus:border-emerald-500 font-mono"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export const FunnelFlowView: React.FC<FunnelFlowViewProps> = ({ 
@@ -819,18 +1212,12 @@ export const FunnelFlowView: React.FC<FunnelFlowViewProps> = ({
 
                       {step.type === 'image' && (
                         <div className="space-y-3">
-                          <div>
-                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                              URL da Imagem / Foto:
-                            </label>
-                            <input
-                              type="text"
-                              value={step.content || ''}
-                              onChange={(e) => handleUpdateStep(step.id, { content: e.target.value })}
-                              className="w-full bg-[#111726] border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-200 outline-none focus:border-emerald-500 transition-all font-mono"
-                              placeholder="https://exemplo.com/foto-do-produto.jpg"
-                            />
-                          </div>
+                          <StepMediaUploader
+                            step={step}
+                            mediaType="image"
+                            onUpdate={(data) => handleUpdateStep(step.id, data)}
+                            organizationId={currentCourse?.organization_id}
+                          />
                           <div>
                             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                               Legenda que acompanha a Foto (Opcional):
@@ -848,18 +1235,12 @@ export const FunnelFlowView: React.FC<FunnelFlowViewProps> = ({
 
                       {step.type === 'video' && (
                         <div className="space-y-3">
-                          <div>
-                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                              URL do Vídeo (.mp4):
-                            </label>
-                            <input
-                              type="text"
-                              value={step.content || ''}
-                              onChange={(e) => handleUpdateStep(step.id, { content: e.target.value })}
-                              className="w-full bg-[#111726] border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-200 outline-none focus:border-emerald-500 transition-all font-mono"
-                              placeholder="https://exemplo.com/demonstracao.mp4"
-                            />
-                          </div>
+                          <StepMediaUploader
+                            step={step}
+                            mediaType="video"
+                            onUpdate={(data) => handleUpdateStep(step.id, data)}
+                            organizationId={currentCourse?.organization_id}
+                          />
                           <div>
                             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                               Legenda do Vídeo:
@@ -877,19 +1258,12 @@ export const FunnelFlowView: React.FC<FunnelFlowViewProps> = ({
 
                       {step.type === 'audio' && (
                         <div>
-                          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                            URL do Arquivo de Áudio (.ogg / .mp3):
-                          </label>
-                          <input
-                            type="text"
-                            value={step.content || ''}
-                            onChange={(e) => handleUpdateStep(step.id, { content: e.target.value })}
-                            className="w-full bg-[#111726] border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-200 outline-none focus:border-emerald-500 transition-all font-mono"
-                            placeholder="https://exemplo.com/audio-explicativo.ogg"
+                          <StepMediaUploader
+                            step={step}
+                            mediaType="audio"
+                            onUpdate={(data) => handleUpdateStep(step.id, data)}
+                            organizationId={currentCourse?.organization_id}
                           />
-                          <p className="text-[10px] text-teal-400 mt-1">
-                            💡 O robô converte e envia automaticamente em formato PTT (microfone verde gravado na hora).
-                          </p>
                         </div>
                       )}
 
