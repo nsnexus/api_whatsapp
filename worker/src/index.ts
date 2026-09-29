@@ -543,6 +543,35 @@ export default {
           });
         }
 
+        if (simResult.dispatchItems && simResult.dispatchItems.length > 0) {
+          const displayLines: string[] = [];
+          for (const item of simResult.dispatchItems) {
+            if (item.type === 'text') {
+              displayLines.push(item.text || '');
+            } else if (item.type === 'image') {
+              displayLines.push(`📸 *[Foto/Banner Enviado]*\n${item.caption ? `_${item.caption}_\n` : ''}${item.url}`);
+            } else if (item.type === 'audio') {
+              displayLines.push(`🎤 *[Áudio PTT Gravado]*\n${item.url}`);
+            } else if (item.type === 'video') {
+              displayLines.push(`🎥 *[Vídeo Enviado]*\n${item.caption ? `_${item.caption}_\n` : ''}${item.url}`);
+            } else if (item.type === 'deliver_materials') {
+              displayLines.push(item.text || '📚 *[Apostilas e Arquivos do Curso Enviados]*');
+            } else if (item.type === 'generate_pix') {
+              const pix = item.pixPayload;
+              displayLines.push(
+                `${item.text ? `${item.text}\n\n` : ''}💳 *DADOS PIX:* R$ ${Number(pix?.amount || 0).toFixed(2)} | Chave: \`${pix?.pixKey}\`\n👇 *Código Copia e Cola:*\n\`${pix?.brCode || 'PIX_CODE'}\``
+              );
+            } else if (item.type === 'deliver_bonus') {
+              displayLines.push(item.text || '🎁 *[Super Bônus Liberado]*');
+            }
+          }
+
+          return jsonResponse({
+            ...simResult,
+            replyText: displayLines.filter(Boolean).join('\n\n━━━━━━━━━━━━━━━━━━━━\n\n'),
+          });
+        }
+
         return jsonResponse(simResult);
       }
 

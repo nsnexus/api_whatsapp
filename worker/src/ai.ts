@@ -70,12 +70,24 @@ export interface AiAction {
   payload?: any;
 }
 
+export interface FlowDispatchItem {
+  type: 'text' | 'image' | 'audio' | 'video' | 'deliver_materials' | 'generate_pix' | 'deliver_bonus';
+  text?: string;
+  url?: string;
+  caption?: string;
+  fileName?: string;
+  pixPayload?: any;
+  materialsPayload?: any[];
+  bonusPayload?: any;
+}
+
 export interface AiReplyResult {
   replyText: string;
   actions: AiAction[];
   courseId?: string;
   courseName?: string;
   ignored?: boolean;
+  dispatchItems?: FlowDispatchItem[];
 }
 
 /**
@@ -87,6 +99,152 @@ function cleanTextForMatching(text: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim();
+}
+
+/**
+ * Verifica se a resposta do cliente é uma confirmação/aceite (Sim, Pode mandar, Quero)
+ */
+function isConfirmationReply(text: string): boolean {
+  const norm = cleanTextForMatching(text);
+  const words = norm.split(/\s+/);
+  const directWords = [
+    'sim',
+    's',
+    'quero',
+    'pode',
+    'manda',
+    'mande',
+    'envia',
+    'enviar',
+    'topo',
+    'aceito',
+    'claro',
+    'vamos',
+    'ok',
+    'beleza',
+    'pago',
+    'comprar',
+    'opa',
+    'concordo',
+  ];
+  if (words.some((w) => directWords.includes(w))) return true;
+  if (
+    /pode mandar|pode enviar|manda ai|manda aí|mande ai|mande aí|quero sim|pode sim|com certeza|sim por favor|manda logo|mande por favor|pode ser|manda pra ca|manda pra mim/i.test(
+      norm
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Verifica se a resposta do cliente é uma confirmação de pagamento PIX
+ */
+function isPaymentReply(text: string): boolean {
+  const norm = cleanTextForMatching(text);
+  const paymentWords = ['paguei', 'pago', 'transferi', 'comprovante', 'pronto'];
+  const words = norm.split(/\s+/);
+  if (words.some((w) => paymentWords.includes(w))) return true;
+  if (
+    /fiz o pix|fiz o pagamento|ta pago|tá pago|ja fiz|já fiz|mandei o pix|mandei o comprovante|segue o comprovante|ja transferi|já transferi|pix feito|pagamento feito|mandei ai/i.test(
+      norm
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Converte blocos do Construtor de Fluxo em itens prontos para disparo
+ */
+function convertStepsToDispatchItems(
+  steps: FlowStep[],
+  course: Course,
+  customerName?: string
+): FlowDispatchItem[] {
+  const items: FlowDispatchItem[] = [];
+
+  for (const step of steps) {
+    let text = step.content || '';
+    if (customerName && text.includes('{nome}')) {
+      text = text.replace(/{nome}/gi, customerName);
+    }
+
+    if (step.type === 'text') {
+      if (text.trim()) {
+        items.push({
+          type: 'text',
+          text,
+        });
+      }
+    } else if (step.type === 'image') {
+      items.push({
+        type: 'image',
+        url: step.content || '',
+        caption: step.caption || undefined,
+        fileName: step.title || 'Foto',
+      });
+    } else if (step.type === 'audio') {
+      items.push({
+        type: 'audio',
+        url: step.content || '',
+        fileName: step.title || 'Áudio de Voz',
+      });
+    } else if (step.type === 'video') {
+      items.push({
+        type: 'video',
+        url: step.content || '',
+        caption: step.caption || undefined,
+        fileName: step.title || 'Vídeo Demonstrativo',
+      });
+    } else if (step.type === 'deliver_materials') {
+      items.push({
+        type: 'deliver_materials',
+        text: text.trim() ? text : undefined,
+        materialsPayload: course.materials,
+      });
+    } else if (step.type === 'generate_pix') {
+      let brCode = '';
+      try {
+        brCode = generatePixBrcode({
+          pixKey: course.pix_key,
+          pixKeyType: course.pix_key_type,
+          merchantName: course.pix_name || 'CURSO ONLINE',
+          merchantCity: course.pix_city || 'SAO PAULO',
+          amount: Number(course.price),
+          description: course.name.slice(0, 20),
+        });
+      } catch (err) {
+        console.error('Erro ao gerar código PIX Copia e Cola:', err);
+      }
+
+      items.push({
+        type: 'generate_pix',
+        text: text.trim() ? text : undefined,
+        pixPayload: {
+          pixKey: course.pix_key,
+          pixKeyType: course.pix_key_type,
+          merchantName: course.pix_name || 'Equipe do Curso',
+          amount: Number(course.price),
+          courseName: course.name,
+          brCode,
+        },
+      });
+    } else if (step.type === 'deliver_bonus') {
+      items.push({
+        type: 'deliver_bonus',
+        text: text.trim() ? text : undefined,
+        bonusPayload: {
+          bonuses: course.bonuses,
+          materials: course.materials,
+        },
+      });
+    }
+  }
+
+  return items;
 }
 
 /**
@@ -128,7 +286,7 @@ export async function generateCourseAiReply(params: {
   // 2. Verificar se o chat tem a IA desativada ou pausada por intervenção humana
   const { data: chat } = await supabase
     .from('chats')
-    .select('id, active_course_id, ai_disabled, ai_paused_until')
+    .select('id, contact_id, active_course_id, ai_disabled, ai_paused_until')
     .eq('id', chatId)
     .maybeSingle();
 
@@ -141,6 +299,17 @@ export async function generateCourseAiReply(params: {
       console.log(`IA em pausa (human handover) para o chat ${chatId} até ${chat.ai_paused_until}`);
       return null;
     }
+  }
+
+  // Carregar dados e custom_fields do contato para acompanhar a etapa do funil
+  let contactRecord: any = null;
+  if (chat?.contact_id) {
+    const { data: cData } = await supabase
+      .from('contacts')
+      .select('id, custom_fields, name, push_name')
+      .eq('id', chat.contact_id)
+      .maybeSingle();
+    contactRecord = cData;
   }
 
   // 3. Buscar todos os cursos ativos desta empresa
@@ -345,30 +514,241 @@ export async function generateCourseAiReply(params: {
             .join('\n')
         : '';
 
-    const customFlowStr = (activeCourse.flow_steps && activeCourse.flow_steps.length > 0)
-      ? `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ROTEIRO EXATO DO FLUXO PROGRAMADO PARA ESTE CURSO (SIGA ESTA SEQUÊNCIA DE AÇÕES):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${activeCourse.flow_steps.map((s, idx) => {
-  const num = idx + 1;
-  if (s.type === 'image') return `Ação ${num}: [ENVIAR FOTO/IMAGEM] ${s.title}${s.caption ? ` (Legenda: "${s.caption}")` : ''}${s.content ? ` URL: ${s.content}` : ''}`;
-  if (s.type === 'text') return `Ação ${num}: [ENVIAR TEXTO] "${s.content || s.title}"`;
-  if (s.type === 'audio') return `Ação ${num}: [ENVIAR ÁUDIO PTT] ${s.title}`;
-  if (s.type === 'video') return `Ação ${num}: [ENVIAR VÍDEO] ${s.title}${s.caption ? ` (Legenda: "${s.caption}")` : ''}`;
-  if (s.type === 'wait_reply') return `Ação ${num}: [AGUARDAR CLIENTE] O robô pausa e aguarda resposta: ${s.wait_condition || 'Confirmação do cliente'}`;
-  if (s.type === 'generate_pix') return `Ação ${num}: [GERAR PIX] Disparar dados e código Copia e Cola do PIX de R$ ${Number(activeCourse.price).toFixed(2)} (tag: [GERAR_PIX])`;
-  if (s.type === 'deliver_materials') return `Ação ${num}: [ENTREGAR MATERIAIS] Disparar os arquivos do curso (tag: [ENTREGAR_CURSO])`;
-  if (s.type === 'deliver_bonus') return `Ação ${num}: [LIBERAR BÔNUS] Disparar os bônus prometidos (tag: [LIBERAR_BONUS])`;
-  return `Ação ${num}: ${s.title}`;
-}).join('\n')}
+    // 5.1 SE O CURSO TEM FLUXO VISUAL PROGRAMADO (FLOW BUILDER)
+    if (activeCourse.flow_steps && activeCourse.flow_steps.length > 0) {
+      // Agrupar os passos em fases separadas por blocos do tipo 'wait_reply'
+      const phases: FlowStep[][] = [];
+      let currentPhase: FlowStep[] = [];
+      for (const s of activeCourse.flow_steps) {
+        if (s.type === 'wait_reply') {
+          phases.push(currentPhase);
+          currentPhase = [];
+        } else {
+          currentPhase.push(s);
+        }
+      }
+      if (currentPhase.length > 0) {
+        phases.push(currentPhase);
+      }
 
-DIRETRIZES DO FLUXO:
-- Siga com prioridade a ordem das Ações programadas acima.
-- Quando chegar em [AGUARDAR CLIENTE], finalize a mensagem e espere a confirmação do cliente antes de disparar o próximo passo.
-- Se o cliente perguntar algo fora do script (dúvidas práticas, objeções), responda com clareza e em seguida retome o próximo passo do fluxo programado.
-`
-      : '';
+      // Estado atual do contato no funil
+      let courseFunnels = contactRecord?.custom_fields?.course_funnels || {};
+      let funnelState = courseFunnels[activeCourse.id];
+
+      // Se o cliente pedir para recomeçar o fluxo
+      if (
+        normalizedIncoming.includes('reiniciar') ||
+        normalizedIncoming.includes('comecar de novo') ||
+        normalizedIncoming.includes('recomecar')
+      ) {
+        funnelState = null;
+      }
+
+      const isConfirmation = isConfirmationReply(incomingText);
+      const isPayment = isPaymentReply(incomingText);
+
+      // Verificar no histórico se a apresentação já havia sido enviada
+      const botSentPresentation = historyMessages.some((m) =>
+        m.role === 'assistant' && (
+          m.content.toLowerCase().includes('posso te mandar') ||
+          m.content.toLowerCase().includes('posso enviar') ||
+          m.content.toLowerCase().includes('henrique') ||
+          m.content.toLowerCase().includes('confianca') ||
+          m.content.toLowerCase().includes('confiança')
+        )
+      );
+
+      let targetPhaseIndex: number | null = null;
+      let nextPhaseIndex: number = 0;
+      let nextWaitingFor: string = 'confirmation';
+
+      if (!funnelState) {
+        if (botSentPresentation && isConfirmation) {
+          // Cliente já tinha recebido a apresentação anteriormente e agora confirmou -> Avança para Fase 1
+          targetPhaseIndex = 1;
+          nextPhaseIndex = 1;
+          nextWaitingFor = 'payment';
+        } else {
+          // Início do funil do curso: dispara a Fase 0 (Apresentação, Banner, Oferta e Pergunta)
+          targetPhaseIndex = 0;
+          nextPhaseIndex = 0;
+          nextWaitingFor = 'confirmation';
+        }
+      } else if (funnelState.phase === 0) {
+        // Estava aguardando confirmação da Fase 0
+        if (isConfirmation) {
+          targetPhaseIndex = 1;
+          nextPhaseIndex = 1;
+          nextWaitingFor = 'payment';
+        } else if (isPayment) {
+          targetPhaseIndex = 2;
+          nextPhaseIndex = 2;
+          nextWaitingFor = 'completed';
+        }
+      } else if (funnelState.phase === 1) {
+        // Estava aguardando pagamento da Fase 1
+        if (isPayment) {
+          targetPhaseIndex = 2;
+          nextPhaseIndex = 2;
+          nextWaitingFor = 'completed';
+        }
+      }
+
+      // Se temos uma fase programada para disparar diretamente
+      if (targetPhaseIndex !== null && phases[targetPhaseIndex] && phases[targetPhaseIndex].length > 0) {
+        if (contactRecord?.id) {
+          courseFunnels = {
+            ...courseFunnels,
+            [activeCourse.id]: {
+              phase: nextPhaseIndex,
+              waiting_for: nextWaitingFor,
+              updated_at: new Date().toISOString(),
+            },
+          };
+
+          await supabase
+            .from('contacts')
+            .update({
+              custom_fields: {
+                ...(contactRecord.custom_fields || {}),
+                course_funnels: courseFunnels,
+              },
+            })
+            .eq('id', contactRecord.id);
+        }
+
+        const dispatchItems = convertStepsToDispatchItems(phases[targetPhaseIndex], activeCourse, customerName);
+
+        return {
+          replyText: '',
+          actions: [],
+          courseId: activeCourse.id,
+          courseName: activeCourse.name,
+          dispatchItems,
+        };
+      }
+
+      // Se o cliente NÃO confirmou (enviou uma dúvida, pergunta prática ou objeção):
+      // Usamos a OpenAI para responder a dúvida de forma humana e retomar o fluxo
+      const closingQuestion =
+        phases[0] && phases[0].length > 0
+          ? phases[0][phases[0].length - 1]?.content || 'Posso enviar o material agora e contar com sua honestidade?'
+          : 'Posso enviar o material agora e contar com sua honestidade?';
+
+      let phaseContext = '';
+      if (!funnelState || funnelState.phase === 0) {
+        phaseContext = `
+O cliente está na fase inicial de apresentação do curso "${activeCourse.name}".
+Ele ainda NÃO confirmou se quer receber o material, mas fez a seguinte pergunta ou objeção: "${incomingText}".
+INSTRUÇÕES OBRIGATÓRIAS:
+1. Responda à dúvida dele de forma clara, simpática e convincente (máximo 2 parágrafos curtos).
+2. Não tente fechar a venda com PIX agora.
+3. Conclua sua resposta convidando-o a continuar com a pergunta exata do fechamento da apresentação:
+"${closingQuestion}"
+`;
+      } else if (funnelState.phase === 1) {
+        phaseContext = `
+O cliente já recebeu os materiais do curso "${activeCourse.name}" e os dados para pagamento do PIX promocional de R$ ${Number(activeCourse.price).toFixed(2)}.
+Ele ainda NÃO enviou o comprovante, mas mandou a mensagem: "${incomingText}".
+INSTRUÇÕES OBRIGATÓRIAS:
+1. Esclareça a dúvida dele sobre o PIX, pagamento ou materiais de forma prestativa.
+2. Lembre-o da Chave PIX: ${activeCourse.pix_key} (${activeCourse.pix_key_type}) e valor R$ ${Number(activeCourse.price).toFixed(2)}.
+3. Lembre-o que assim que enviar o comprovante aqui, você libera o SUPER BÔNUS EXCLUSIVO!
+`;
+      } else {
+        phaseContext = `
+O cliente já concluiu a compra e recebeu os materiais e bônus.
+Mensagem do cliente: "${incomingText}".
+Atenda-o como um instrutor prestativo e dê o suporte necessário.
+`;
+      }
+
+      const objectionSystemPrompt = `
+Você é o consultor de vendas oficial do curso "${activeCourse.name}".
+DESCRIÇÃO: ${activeCourse.description || 'Curso prático.'}
+PREÇO: R$ ${Number(activeCourse.price).toFixed(2)}
+CHAVE PIX: ${activeCourse.pix_key} (${activeCourse.pix_key_type})
+BENEFICIÁRIO: ${activeCourse.pix_name || 'Equipe do Curso'}
+
+PERSONA DO INSTRUTOR:
+${activeCourse.ai_persona ? activeCourse.ai_persona.replace(/<!--FLOW_STEPS:.*?-->/gs, '').trim() : 'Atenda com entusiasmo e conduza com clareza.'}
+
+MATERIAIS CADASTRADOS:
+${materialsStr}
+
+BÔNUS:
+${bonusesStr}
+
+QUEBRA DE OBJEÇÕES E DÚVIDAS:
+${objectionsStr}
+
+SITUAÇÃO ATUAL DO CLIENTE NO FUNIL:
+${phaseContext}
+
+REGRAS DE CONVERSAÇÃO:
+- Responda como uma pessoa real no WhatsApp (parágrafos curtos, emojis com bom senso, tom amigável).
+- NUNCA diga que é uma IA ou robô.
+- Se o cliente solicitar atendimento humano explicitamente, inclua a tag [CHAMAR_HUMANO].
+`.trim();
+
+      const openAiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+        { role: 'system', content: objectionSystemPrompt },
+      ];
+      for (const h of historyMessages.slice(-6)) {
+        openAiMessages.push({ role: h.role, content: h.content });
+      }
+      openAiMessages.push({ role: 'user', content: incomingText });
+
+      const modelToUse = aiSettings.openai_model || 'gpt-5.6-luna';
+      const isReasoningModel =
+        modelToUse.includes('gpt-5') ||
+        modelToUse.includes('o1') ||
+        modelToUse.includes('o3');
+
+      const requestPayload: Record<string, any> = {
+        model: modelToUse,
+        messages: openAiMessages,
+        max_completion_tokens: 450,
+      };
+      if (!isReasoningModel) {
+        requestPayload.temperature = 0.7;
+      }
+
+      try {
+        const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${aiSettings.openai_api_key}`,
+          },
+          body: JSON.stringify(requestPayload),
+        });
+
+        if (resp.ok) {
+          const json = (await resp.json()) as any;
+          let reply = json?.choices?.[0]?.message?.content || '';
+          const actions: AiAction[] = [];
+          if (reply.includes('[CHAMAR_HUMANO]')) {
+            actions.push({ type: 'human_handover' });
+            reply = reply.replace(/\[CHAMAR_HUMANO\]/gi, '').trim();
+            if (chat) {
+              await supabase.from('chats').update({ ai_disabled: true }).eq('id', chatId);
+            }
+          }
+          return {
+            replyText: reply,
+            actions,
+            courseId: activeCourse.id,
+            courseName: activeCourse.name,
+          };
+        }
+      } catch (err) {
+        console.error('Erro na chamada da OpenAI para objeção:', err);
+      }
+    }
+
+    // 5.2 Se o curso NÃO possui fluxo visual cadastrado: segue a estratégia padrão de 3 etapas
+    const customFlowStr = '';
 
     systemPrompt = `
 🚨 REGRA NÚMERO 1 ABSOLUTA (LEIA ANTES DE TUDO):

@@ -316,53 +316,115 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
             historyMessages,
           });
 
-          if (
-            aiResult && 
-            !aiResult.ignored && 
-            aiResult.replyText && 
-            aiResult.replyText.trim() && 
-            !aiResult.replyText.includes('[IGNORAR]')
-          ) {
+          if (aiResult && !aiResult.ignored) {
             const evolution = new EvolutionGoClient(env);
 
-            // 1. Enviar mensagem de texto no WhatsApp do cliente
-            await evolution.sendText(instanceName, {
-              number: cleanPhone,
-              text: aiResult.replyText,
-            });
+            // A. Se o robô disparou passos programados do Construtor de Fluxo (Flow Builder)
+            if (aiResult.dispatchItems && aiResult.dispatchItems.length > 0) {
+              let lastSentText = '';
 
-            // 2. Se a IA acionou a entrega de todos os materiais do curso [ENTREGAR_CURSO]
-            const deliverMaterialsAction = aiResult.actions.find(
-              (a) => a.type === 'deliver_course_materials'
-            );
-            if (deliverMaterialsAction && Array.isArray(deliverMaterialsAction.payload)) {
-              for (const mat of deliverMaterialsAction.payload) {
-                if (mat.url) {
-                  try {
-                    await sendEvolutionMedia(evolution, instanceName, cleanPhone, mat);
-                  } catch (mErr) {
-                    console.error('Erro ao enviar material do curso:', mErr);
+              for (const item of aiResult.dispatchItems) {
+                if (item.type === 'text' && item.text) {
+                  await evolution.sendText(instanceName, {
+                    number: cleanPhone,
+                    text: item.text,
+                  });
+                  await supabase.from('messages').insert({
+                    organization_id: organizationId,
+                    chat_id: chat.id,
+                    instance_id: instanceId,
+                    direction: 'outbound',
+                    sender_type: 'bot',
+                    type: 'text',
+                    content: item.text,
+                    status: 'sent',
+                  });
+                  lastSentText = item.text;
+                  await new Promise((r) => setTimeout(r, 800));
+                } else if ((item.type === 'image' || item.type === 'video' || item.type === 'audio') && item.url) {
+                  await sendEvolutionMedia(evolution, instanceName, cleanPhone, {
+                    url: item.url,
+                    caption: item.caption,
+                    type: item.type,
+                    name: item.fileName,
+                  });
+                  await supabase.from('messages').insert({
+                    organization_id: organizationId,
+                    chat_id: chat.id,
+                    instance_id: instanceId,
+                    direction: 'outbound',
+                    sender_type: 'bot',
+                    type: item.type,
+                    content: item.caption || item.fileName || '',
+                    media_url: item.url,
+                    status: 'sent',
+                  });
+                  if (item.caption) lastSentText = item.caption;
+                  await new Promise((r) => setTimeout(r, 1000));
+                } else if (item.type === 'deliver_materials') {
+                  if (item.text) {
+                    await evolution.sendText(instanceName, {
+                      number: cleanPhone,
+                      text: item.text,
+                    });
+                    await supabase.from('messages').insert({
+                      organization_id: organizationId,
+                      chat_id: chat.id,
+                      instance_id: instanceId,
+                      direction: 'outbound',
+                      sender_type: 'bot',
+                      type: 'text',
+                      content: item.text,
+                      status: 'sent',
+                    });
+                    lastSentText = item.text;
+                    await new Promise((r) => setTimeout(r, 800));
                   }
-                }
-              }
-            }
-
-            // 3. Se a IA acionou envio de material individual [ENVIAR_MATERIAL: ...]
-            for (const action of aiResult.actions) {
-              if (action.type === 'send_media' && action.payload?.url) {
-                try {
-                  await sendEvolutionMedia(evolution, instanceName, cleanPhone, action.payload);
-                } catch (mErr) {
-                  console.error('Erro ao enviar mídia avulsa:', mErr);
-                }
-              }
-            }
-
-            // 4. Se a IA gerou PIX [GERAR_PIX]
-            const pixAction = aiResult.actions.find((a) => a.type === 'pix_generated');
-            if (pixAction && pixAction.payload) {
-              const pix = pixAction.payload;
-              const pixInfoMsg = `💳 *DADOS PARA PAGAMENTO VIA PIX:*
+                  if (Array.isArray(item.materialsPayload)) {
+                    for (const mat of item.materialsPayload) {
+                      if (mat.url) {
+                        try {
+                          await sendEvolutionMedia(evolution, instanceName, cleanPhone, mat);
+                          await supabase.from('messages').insert({
+                            organization_id: organizationId,
+                            chat_id: chat.id,
+                            instance_id: instanceId,
+                            direction: 'outbound',
+                            sender_type: 'bot',
+                            type: 'document',
+                            content: mat.name || 'Material do Curso',
+                            media_url: mat.url,
+                            status: 'sent',
+                          });
+                          await new Promise((r) => setTimeout(r, 1000));
+                        } catch (mErr) {
+                          console.error('Erro ao enviar material do curso:', mErr);
+                        }
+                      }
+                    }
+                  }
+                } else if (item.type === 'generate_pix') {
+                  if (item.text) {
+                    await evolution.sendText(instanceName, {
+                      number: cleanPhone,
+                      text: item.text,
+                    });
+                    await supabase.from('messages').insert({
+                      organization_id: organizationId,
+                      chat_id: chat.id,
+                      instance_id: instanceId,
+                      direction: 'outbound',
+                      sender_type: 'bot',
+                      type: 'text',
+                      content: item.text,
+                      status: 'sent',
+                    });
+                    lastSentText = item.text;
+                    await new Promise((r) => setTimeout(r, 800));
+                  }
+                  if (item.pixPayload) {
+                    const pix = item.pixPayload;
+                    const pixInfoMsg = `💳 *DADOS PARA PAGAMENTO VIA PIX:*
 📚 *Curso:* ${pix.courseName}
 💰 *Valor:* R$ ${Number(pix.amount).toFixed(2)}
 👤 *Beneficiário:* ${pix.merchantName || 'Equipe do Curso'}
@@ -370,60 +432,204 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
 
 👇 *Código Copia e Cola oficial abaixo:*`;
 
+                    await evolution.sendText(instanceName, {
+                      number: cleanPhone,
+                      text: pixInfoMsg,
+                    });
+                    await supabase.from('messages').insert({
+                      organization_id: organizationId,
+                      chat_id: chat.id,
+                      instance_id: instanceId,
+                      direction: 'outbound',
+                      sender_type: 'bot',
+                      type: 'text',
+                      content: pixInfoMsg,
+                      status: 'sent',
+                    });
+                    lastSentText = pixInfoMsg;
+                    await new Promise((r) => setTimeout(r, 800));
+
+                    if (pix.brCode) {
+                      await evolution.sendText(instanceName, {
+                        number: cleanPhone,
+                        text: pix.brCode,
+                      });
+                      await supabase.from('messages').insert({
+                        organization_id: organizationId,
+                        chat_id: chat.id,
+                        instance_id: instanceId,
+                        direction: 'outbound',
+                        sender_type: 'bot',
+                        type: 'text',
+                        content: pix.brCode,
+                        status: 'sent',
+                      });
+                      await new Promise((r) => setTimeout(r, 800));
+                    }
+                  }
+                } else if (item.type === 'deliver_bonus') {
+                  if (item.text) {
+                    await evolution.sendText(instanceName, {
+                      number: cleanPhone,
+                      text: item.text,
+                    });
+                    await supabase.from('messages').insert({
+                      organization_id: organizationId,
+                      chat_id: chat.id,
+                      instance_id: instanceId,
+                      direction: 'outbound',
+                      sender_type: 'bot',
+                      type: 'text',
+                      content: item.text,
+                      status: 'sent',
+                    });
+                    lastSentText = item.text;
+                    await new Promise((r) => setTimeout(r, 800));
+                  }
+                  if (item.bonusPayload?.bonuses && Array.isArray(item.bonusPayload.bonuses) && item.bonusPayload.bonuses.length > 0) {
+                    const bonusText =
+                      `🎁 *SEUS SUPER BÔNUS EXCLUSIVOS:*\n\n` +
+                      item.bonusPayload.bonuses
+                        .map(
+                          (b: any) =>
+                            `✨ *${b.name}* ${b.value ? `(Valor de R$ ${Number(b.value).toFixed(2)} Grátis)` : ''}\n${b.description || ''}`
+                        )
+                        .join('\n\n');
+
+                    await evolution.sendText(instanceName, {
+                      number: cleanPhone,
+                      text: bonusText,
+                    });
+                    await supabase.from('messages').insert({
+                      organization_id: organizationId,
+                      chat_id: chat.id,
+                      instance_id: instanceId,
+                      direction: 'outbound',
+                      sender_type: 'bot',
+                      type: 'text',
+                      content: bonusText,
+                      status: 'sent',
+                    });
+                    lastSentText = bonusText;
+                  }
+                }
+              }
+
+              if (lastSentText) {
+                await supabase
+                  .from('chats')
+                  .update({
+                    last_message_text: lastSentText,
+                    last_message_at: new Date().toISOString(),
+                  })
+                  .eq('id', chat.id);
+              }
+            } else if (
+              aiResult.replyText && 
+              aiResult.replyText.trim() && 
+              !aiResult.replyText.includes('[IGNORAR]')
+            ) {
+              // B. Mensagem padrão via IA (resposta a dúvidas/objeções ou funil sem fluxo)
+              // 1. Enviar mensagem de texto no WhatsApp do cliente
               await evolution.sendText(instanceName, {
                 number: cleanPhone,
-                text: pixInfoMsg,
+                text: aiResult.replyText,
               });
 
-              if (pix.brCode) {
-                // Envia UMA mensagem exclusiva apenas com o código puro para o cliente só tocar e copiar
+              // 2. Se a IA acionou a entrega de todos os materiais do curso [ENTREGAR_CURSO]
+              const deliverMaterialsAction = aiResult.actions.find(
+                (a) => a.type === 'deliver_course_materials'
+              );
+              if (deliverMaterialsAction && Array.isArray(deliverMaterialsAction.payload)) {
+                for (const mat of deliverMaterialsAction.payload) {
+                  if (mat.url) {
+                    try {
+                      await sendEvolutionMedia(evolution, instanceName, cleanPhone, mat);
+                    } catch (mErr) {
+                      console.error('Erro ao enviar material do curso:', mErr);
+                    }
+                  }
+                }
+              }
+
+              // 3. Se a IA acionou envio de material individual [ENVIAR_MATERIAL: ...]
+              for (const action of aiResult.actions) {
+                if (action.type === 'send_media' && action.payload?.url) {
+                  try {
+                    await sendEvolutionMedia(evolution, instanceName, cleanPhone, action.payload);
+                  } catch (mErr) {
+                    console.error('Erro ao enviar mídia avulsa:', mErr);
+                  }
+                }
+              }
+
+              // 4. Se a IA gerou PIX [GERAR_PIX]
+              const pixAction = aiResult.actions.find((a) => a.type === 'pix_generated');
+              if (pixAction && pixAction.payload) {
+                const pix = pixAction.payload;
+                const pixInfoMsg = `💳 *DADOS PARA PAGAMENTO VIA PIX:*
+📚 *Curso:* ${pix.courseName}
+💰 *Valor:* R$ ${Number(pix.amount).toFixed(2)}
+👤 *Beneficiário:* ${pix.merchantName || 'Equipe do Curso'}
+🔑 *Chave PIX:* \`${pix.pixKey}\`
+
+👇 *Código Copia e Cola oficial abaixo:*`;
+
                 await evolution.sendText(instanceName, {
                   number: cleanPhone,
-                  text: pix.brCode,
+                  text: pixInfoMsg,
                 });
+
+                if (pix.brCode) {
+                  // Envia UMA mensagem exclusiva apenas com o código puro para o cliente só tocar e copiar
+                  await evolution.sendText(instanceName, {
+                    number: cleanPhone,
+                    text: pix.brCode,
+                  });
+                }
               }
-            }
 
-            // 5. Se a IA liberou os Super Bônus [LIBERAR_BONUS]
-            const bonusAction = aiResult.actions.find((a) => a.type === 'deliver_bonus');
-            if (bonusAction && bonusAction.payload) {
-              const { bonuses } = bonusAction.payload;
-              if (Array.isArray(bonuses) && bonuses.length > 0) {
-                const bonusText =
-                  `🎁 *SEUS SUPER BÔNUS EXCLUSIVOS:*\n\n` +
-                  bonuses
-                    .map(
-                      (b: any) =>
-                        `✨ *${b.name}* ${b.value ? `(Valor de R$ ${Number(b.value).toFixed(2)} Grátis)` : ''}\n${b.description || ''}`
-                    )
-                    .join('\n\n');
+              // 5. Se a IA liberou os Super Bônus [LIBERAR_BONUS]
+              const bonusAction = aiResult.actions.find((a) => a.type === 'deliver_bonus');
+              if (bonusAction && bonusAction.payload) {
+                const { bonuses } = bonusAction.payload;
+                if (Array.isArray(bonuses) && bonuses.length > 0) {
+                  const bonusText =
+                    `🎁 *SEUS SUPER BÔNUS EXCLUSIVOS:*\n\n` +
+                    bonuses
+                      .map(
+                        (b: any) =>
+                          `✨ *${b.name}* ${b.value ? `(Valor de R$ ${Number(b.value).toFixed(2)} Grátis)` : ''}\n${b.description || ''}`
+                      )
+                      .join('\n\n');
 
-                await evolution.sendText(instanceName, {
-                  number: cleanPhone,
-                  text: bonusText,
-                });
+                  await evolution.sendText(instanceName, {
+                    number: cleanPhone,
+                    text: bonusText,
+                  });
+                }
               }
+
+              // 6. Atualizar a prévia do chat no CRM e gravar a mensagem de saída
+              await supabase
+                .from('chats')
+                .update({
+                  last_message_text: aiResult.replyText,
+                  last_message_at: new Date().toISOString(),
+                })
+                .eq('id', chat.id);
+
+              await supabase.from('messages').insert({
+                organization_id: organizationId,
+                chat_id: chat.id,
+                instance_id: instanceId,
+                direction: 'outbound',
+                sender_type: 'bot',
+                type: 'text',
+                content: aiResult.replyText,
+                status: 'sent',
+              });
             }
-
-            // 6. Atualizar a prévia do chat no CRM e gravar a mensagem de saída
-            await supabase
-              .from('chats')
-              .update({
-                last_message_text: aiResult.replyText,
-                last_message_at: new Date().toISOString(),
-              })
-              .eq('id', chat.id);
-
-            await supabase.from('messages').insert({
-              organization_id: organizationId,
-              chat_id: chat.id,
-              instance_id: instanceId,
-              direction: 'outbound',
-              sender_type: 'bot',
-              type: 'text',
-              content: aiResult.replyText,
-              status: 'sent',
-            });
           } else if (aiResult?.ignored) {
             console.log(`[AI Bot] Mensagem de ${cleanPhone} desconsiderada: não referente a cursos.`);
           }
