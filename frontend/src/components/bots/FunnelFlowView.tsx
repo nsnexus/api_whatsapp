@@ -767,14 +767,15 @@ export const FunnelFlowView: React.FC<FunnelFlowViewProps> = ({
 
       const personaWithFlow = `${cleanPersona}\n\n<!--FLOW_STEPS:${JSON.stringify(steps)}-->`;
 
-      await onSaveCourse({
-        id: currentCourse.id,
-        organization_id: currentCourse.organization_id,
-        name: currentCourse.name,
-        price: currentCourse.price,
-        ai_persona: personaWithFlow,
-        flow_steps: steps,
-      });
+      if (onSaveCourse) {
+        await onSaveCourse({
+          id: currentCourse.id,
+          ai_persona: personaWithFlow,
+        });
+      }
+
+      // Atualiza localmente o curso selecionado para refletir a persona salva
+      currentCourse.ai_persona = personaWithFlow;
 
       setIsDirty(false);
       setSaveSuccess(true);

@@ -97,21 +97,25 @@ export const CoursesBotsView: React.FC<CoursesBotsViewProps> = ({
   };
 
   const handleSaveCourse = async (courseData: Partial<Course>) => {
-    if (editingCourse) {
+    // Sanitiza dados para o banco: remove campos virtuais que não existem como coluna em courses
+    const { flow_steps, id: targetId, ...dbData } = courseData as any;
+    const courseId = targetId || editingCourse?.id;
+
+    if (courseId) {
       // Update
       const { error } = await supabase
         .from('courses')
         .update({
-          ...courseData,
+          ...dbData,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', editingCourse.id);
+        .eq('id', courseId);
 
       if (error) throw error;
     } else {
       // Insert
       const { error } = await supabase.from('courses').insert({
-        ...courseData,
+        ...dbData,
         organization_id: organizationId,
       });
 
