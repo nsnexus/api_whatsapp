@@ -646,12 +646,27 @@ export async function generateCourseAiReply(params: {
       let courseFunnels = contactRecord?.custom_fields?.course_funnels || {};
       let funnelState = courseFunnels[activeCourse.id];
 
-      // Se o cliente pedir para recomeçar o fluxo
-      if (
+      // Se o cliente pedir para recomeçar o fluxo ou enviar uma mensagem de primeiro contato / gatilho inicial:
+      const isInitialCourseInquiry =
         normalizedIncoming.includes('reiniciar') ||
         normalizedIncoming.includes('comecar de novo') ||
-        normalizedIncoming.includes('recomecar')
-      ) {
+        normalizedIncoming.includes('recomecar') ||
+        normalizedIncoming.includes('saber mais') ||
+        normalizedIncoming.includes('gostaria de saber') ||
+        normalizedIncoming.includes('tenho interesse') ||
+        normalizedIncoming.includes('quero saber') ||
+        normalizedIncoming.includes('quero o curso') ||
+        normalizedIncoming.includes('quero fazer o curso') ||
+        normalizedIncoming.includes('quero aprender') ||
+        normalizedIncoming.includes('como funciona') ||
+        normalizedIncoming.includes('informacoes') ||
+        normalizedIncoming.includes('informacao') ||
+        activeCourse.triggers.some((trig) => {
+          const cleanTrig = cleanTextForMatching(trig);
+          return cleanTrig && normalizedIncoming.includes(cleanTrig);
+        });
+
+      if (isInitialCourseInquiry) {
         funnelState = null;
       }
 
@@ -721,6 +736,11 @@ export async function generateCourseAiReply(params: {
           courseId: activeCourse.id,
           courseName: activeCourse.name,
         };
+      } else if (isInitialCourseInquiry) {
+        // Dispara Fase 0 limpa do início do funil mesmo que existam mensagens antigas no chat
+        targetPhaseIndex = 0;
+        nextPhaseIndex = 0;
+        nextWaitingFor = 'confirmation';
       } else if (!funnelState) {
         if (botSentPresentation && isConfirmation) {
           // Cliente já tinha recebido a apresentação anteriormente e agora confirmou -> Avança para Fase 1
