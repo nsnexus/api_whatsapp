@@ -465,8 +465,13 @@ export async function generateCourseAiReply(params: {
     return normalizedIncoming.includes(kw);
   });
 
-  if (!activeCourse && hasRecentBotInteraction && isFunnelReply && chat?.active_course_id) {
-    activeCourse = courses.find((c) => c.id === chat.active_course_id);
+  if (!activeCourse && hasRecentBotInteraction && isFunnelReply) {
+    if (chat?.active_course_id) {
+      activeCourse = courses.find((c) => c.id === chat.active_course_id);
+    }
+    if (!activeCourse && courses.length === 1) {
+      activeCourse = courses[0];
+    }
   }
 
   // 🛑 FILTRO DE SEGURANÇA MÁXIMA: Se a mensagem NÃO contém gatilho de curso, NÃO contém palavra de curso
@@ -547,7 +552,7 @@ export async function generateCourseAiReply(params: {
       const isConfirmation = isConfirmationReply(incomingText);
       const isPayment = isPaymentReply(incomingText);
 
-      // Verificar no histórico se a apresentação já havia sido enviada
+      // Verificar no histórico se a apresentação ou o PIX já haviam sido enviados
       const botSentPresentation = historyMessages.some((m) =>
         m.role === 'assistant' && (
           m.content.toLowerCase().includes('posso te mandar') ||
@@ -558,16 +563,35 @@ export async function generateCourseAiReply(params: {
         )
       );
 
+      const botSentPixOrMaterials = historyMessages.some((m) =>
+        m.role === 'assistant' && (
+          m.content.toLowerCase().includes('pix') ||
+          m.content.toLowerCase().includes('copia e cola') ||
+          m.content.toLowerCase().includes('bônus') ||
+          m.content.toLowerCase().includes('bonus') ||
+          m.content.toLowerCase().includes('materiais') ||
+          m.content.toLowerCase().includes('apostilas')
+        )
+      );
+
       let targetPhaseIndex: number | null = null;
       let nextPhaseIndex: number = 0;
       let nextWaitingFor: string = 'confirmation';
 
       if (!funnelState) {
-        if (botSentPresentation && isConfirmation) {
+        if (botSentPixOrMaterials && isPayment) {
+          // Cliente já tinha recebido o PIX anteriormente e agora confirmou pagamento -> Avança para Fase 2
+          targetPhaseIndex = 2;
+          nextPhaseIndex = 2;
+          nextWaitingFor = 'completed';
+        } else if (botSentPresentation && isConfirmation) {
           // Cliente já tinha recebido a apresentação anteriormente e agora confirmou -> Avança para Fase 1
           targetPhaseIndex = 1;
           nextPhaseIndex = 1;
           nextWaitingFor = 'payment';
+        } else if (botSentPresentation) {
+          // Apresentação já foi enviada no histórico: cliente fez uma dúvida/pergunta, deixa a IA responder
+          targetPhaseIndex = null;
         } else {
           // Início do funil do curso: dispara a Fase 0 (Apresentação, Banner, Oferta e Pergunta)
           targetPhaseIndex = 0;
