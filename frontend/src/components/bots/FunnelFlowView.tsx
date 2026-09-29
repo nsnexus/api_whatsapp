@@ -29,7 +29,8 @@ import {
   RotateCcw,
   ExternalLink,
   Layers,
-  Info
+  Info,
+  Package
 } from 'lucide-react';
 import { Course, FlowStep, FlowStepType } from '../../types';
 
