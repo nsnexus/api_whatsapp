@@ -176,9 +176,11 @@ export const CoursesBotsView: React.FC<CoursesBotsViewProps> = ({
     await loadData();
   };
 
+  const [selectedInstanceFilter, setSelectedInstanceFilter] = useState<string>('all');
+
   const handleCopyCourseLink = (course: Course) => {
-    const triggerWord = course.triggers?.[0] || course.name;
-    const cleanNumber = (connectedPhone || '559491064043').replace(/\D/g, '');
+    const targetInstance = instances.find((i) => i.id === course.instance_id) || connectedInstance;
+    const cleanNumber = (targetInstance?.phone_number || connectedPhone || '559491064043').replace(/\D/g, '');
     const link = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(
       `Olá, gostaria de saber mais sobre o curso de ${course.name}`
     )}`;
@@ -188,11 +190,18 @@ export const CoursesBotsView: React.FC<CoursesBotsViewProps> = ({
     setTimeout(() => setCopiedCourseId(null), 2000);
   };
 
-  const filteredCourses = courses.filter((c) =>
-    (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (c.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (c.triggers || []).some((t) => t.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredCourses = courses.filter((c) => {
+    const matchesSearch =
+      (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (c.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (c.triggers || []).some((t) => t.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    const matchesInstance =
+      selectedInstanceFilter === 'all' ||
+      c.instance_id === selectedInstanceFilter;
+
+    return matchesSearch && matchesInstance;
+  });
 
   const activeCoursesCount = courses.filter((c) => c.is_active).length;
 
@@ -226,7 +235,13 @@ export const CoursesBotsView: React.FC<CoursesBotsViewProps> = ({
             <div className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span className="text-slate-400">WhatsApp:</span>
-              <span className="font-mono font-bold text-white">+{connectedPhone}</span>
+              {instances.length > 1 ? (
+                <span className="font-bold text-white">
+                  {instances.filter((i) => i.status === 'connected').length} de {instances.length} instâncias
+                </span>
+              ) : (
+                <span className="font-mono font-bold text-white">+{connectedPhone}</span>
+              )}
             </div>
 
             <button
@@ -296,19 +311,62 @@ export const CoursesBotsView: React.FC<CoursesBotsViewProps> = ({
         {activeTab === 'cursos' && (
           <div className="space-y-6">
             {/* Top Bar de Pesquisa & Métricas */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="relative w-full sm:w-80">
-                <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar curso por nome ou gatilho..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-[#161c2d] border border-slate-800 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-                />
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-1">
+                <div className="relative w-full sm:w-80">
+                  <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar curso por nome ou gatilho..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full bg-[#161c2d] border border-slate-800 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                {/* Filtro por Instância WhatsApp */}
+                {instances.length > 1 && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 sm:pb-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedInstanceFilter('all')}
+                      className={`px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                        selectedInstanceFilter === 'all'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm shadow-emerald-500/10'
+                          : 'bg-[#161c2d] border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                      }`}
+                    >
+                      Todos os WhatsApps
+                    </button>
+                    {instances.map((inst) => (
+                      <button
+                        key={inst.id}
+                        type="button"
+                        onClick={() => setSelectedInstanceFilter(inst.id)}
+                        className={`px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-all ${
+                          selectedInstanceFilter === inst.id
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm shadow-emerald-500/10'
+                            : 'bg-[#161c2d] border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                        }`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            inst.status === 'connected' ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+                          }`}
+                        />
+                        <span>{inst.name}</span>
+                        {inst.phone_number && (
+                          <span className="font-mono text-[10px] text-slate-400">
+                            (+{inst.phone_number})
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
                 <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-400 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-400" />
                   <span>
@@ -393,6 +451,30 @@ export const CoursesBotsView: React.FC<CoursesBotsViewProps> = ({
                             }`}
                           />
                         </button>
+                      </div>
+
+                      {/* WhatsApp da Instância Vinculada */}
+                      <div className="mb-3">
+                        {c.instance_id ? (() => {
+                          const inst = instances.find((i) => i.id === c.instance_id);
+                          return (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 text-[11px] text-slate-300">
+                              <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+                              <span className="text-slate-400 font-medium">WhatsApp:</span>
+                              <span className="text-white font-bold">{inst?.name || 'Instância'}</span>
+                              {inst?.phone_number && (
+                                <span className="text-emerald-400 font-mono text-[10px]">
+                                  +{inst.phone_number}
+                                </span>
+                              )}
+                            </span>
+                          );
+                        })() : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 text-[11px] text-slate-400">
+                            <Zap className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Responde em Todas as Instâncias</span>
+                          </span>
+                        )}
                       </div>
 
                       {/* Descrição */}
@@ -512,6 +594,7 @@ export const CoursesBotsView: React.FC<CoursesBotsViewProps> = ({
         onClose={() => setIsModalOpen(false)}
         course={editingCourse}
         organizationId={organizationId}
+        instances={instances}
         connectedPhone={connectedPhone}
         onSave={handleSaveCourse}
       />

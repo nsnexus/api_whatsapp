@@ -37,6 +37,7 @@ export interface FlowStep {
 export interface Course {
   id: string;
   organization_id: string;
+  instance_id?: string | null;
   name: string;
   slug?: string;
   description: string;
@@ -353,6 +354,7 @@ Responda EXATAMENTE um objeto JSON no seguinte formato:
 export async function generateCourseAiReply(params: {
   supabase: SupabaseClient;
   organizationId: string;
+  instanceId?: string;
   chatId: string;
   incomingText: string;
   customerName?: string;
@@ -366,6 +368,7 @@ export async function generateCourseAiReply(params: {
   const {
     supabase,
     organizationId,
+    instanceId,
     chatId,
     incomingText,
     customerName,
@@ -418,12 +421,18 @@ export async function generateCourseAiReply(params: {
     contactRecord = cData;
   }
 
-  // 3. Buscar todos os cursos ativos desta empresa
-  const { data: coursesData } = await supabase
+  // 3. Buscar todos os cursos ativos desta empresa (e desta instância se especificado)
+  let coursesQuery = supabase
     .from('courses')
     .select('*')
     .eq('organization_id', organizationId)
     .eq('is_active', true);
+
+  if (instanceId) {
+    coursesQuery = coursesQuery.or(`instance_id.eq.${instanceId},instance_id.is.null`);
+  }
+
+  const { data: coursesData } = await coursesQuery;
 
   const courses: Course[] = (coursesData || []).map((c: any) => {
     let steps: FlowStep[] = [];

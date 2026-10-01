@@ -23,9 +23,10 @@ import {
   Image as ImageIcon,
   Video as VideoIcon,
   Music as AudioIcon,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Smartphone
 } from 'lucide-react';
-import { Course, MaterialItem, BonusItem, FaqObjection } from '../../types';
+import { Course, MaterialItem, BonusItem, FaqObjection, Instance } from '../../types';
 import { generatePixBrcode, getQrCodeImageUrl } from '../../lib/pix';
 import { supabase } from '../../lib/supabase';
 
@@ -34,6 +35,7 @@ interface CourseModalProps {
   onClose: () => void;
   course: Course | null;
   organizationId: string;
+  instances?: Instance[];
   connectedPhone?: string | null;
   onSave: (courseData: Partial<Course>) => Promise<void>;
 }
@@ -43,6 +45,7 @@ export const CourseModal: React.FC<CourseModalProps> = ({
   onClose,
   course,
   organizationId,
+  instances = [],
   connectedPhone = '559491064043',
   onSave,
 }) => {
@@ -52,6 +55,7 @@ export const CourseModal: React.FC<CourseModalProps> = ({
   const [copiedPix, setCopiedPix] = useState(false);
 
   // Form State
+  const [instanceId, setInstanceId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [description, setDescription] = useState('');
@@ -98,6 +102,7 @@ export const CourseModal: React.FC<CourseModalProps> = ({
 
   useEffect(() => {
     if (course) {
+      setInstanceId(course.instance_id || null);
       setName(course.name || '');
       setSlug(course.slug || '');
       setDescription(course.description || '');
@@ -115,6 +120,7 @@ export const CourseModal: React.FC<CourseModalProps> = ({
       setPixCity(course.pix_city || 'SAO PAULO');
     } else {
       // Defaults para novo curso
+      setInstanceId(instances?.[0]?.id || null);
       setName('');
       setSlug('');
       setDescription('');
@@ -137,18 +143,21 @@ export const CourseModal: React.FC<CourseModalProps> = ({
           reply_guide: 'Enfatize que as aulas são direto ao ponto de 15 minutos e você pode assistir no celular quando quiser.',
         },
       ]);
-      setPixKey(connectedPhone || '');
+      const defaultPhone = instances?.[0]?.phone_number || connectedPhone || '';
+      setPixKey(defaultPhone);
       setPixKeyType('phone');
       setPixName('Narciso');
       setPixCity('SAO PAULO');
     }
     setActiveTab('geral');
-  }, [course, isOpen, connectedPhone]);
+  }, [course, isOpen, connectedPhone, instances]);
 
   if (!isOpen) return null;
 
-  // Gerador de link do WhatsApp para o curso
-  const cleanPhone = (connectedPhone || '559491064043').replace(/\D/g, '');
+  // Gerador de link do WhatsApp para o curso baseado na instância selecionada
+  const selectedInstance = instances.find((i) => i.id === instanceId);
+  const currentPhone = selectedInstance?.phone_number || connectedPhone || '559491064043';
+  const cleanPhone = currentPhone.replace(/\D/g, '');
   const sampleTrigger = triggers[0] || name || 'curso';
   const whatsappLink = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(
     `Olá, gostaria de saber mais sobre o curso de ${name || 'Inglês'}`
@@ -399,6 +408,7 @@ export const CourseModal: React.FC<CourseModalProps> = ({
     try {
       await onSave({
         organization_id: organizationId,
+        instance_id: instanceId || null,
         name: name.trim(),
         slug: slug.trim() || name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
         description: description.trim(),
@@ -543,6 +553,103 @@ export const CourseModal: React.FC<CourseModalProps> = ({
           {/* ABA 1: GERAL & PREÇO */}
           {activeTab === 'geral' && (
             <div className="space-y-4 animate-fadeIn">
+              {/* Seletor de Instância do WhatsApp */}
+              <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-bold text-white flex items-center gap-2">
+                      <Smartphone className="w-4 h-4 text-emerald-400" />
+                      Número de WhatsApp que Atenderá este Curso *
+                    </label>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Defina qual das suas instâncias conectadas vai receber as mensagens e fechar as vendas com IA.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                  {/* Opção: Todas as instâncias */}
+                  <div
+                    onClick={() => setInstanceId(null)}
+                    className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${
+                      instanceId === null
+                        ? 'bg-emerald-500/10 border-emerald-500/50 shadow-md shadow-emerald-500/5'
+                        : 'bg-[#111726] border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div
+                      className={`mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                        instanceId === null ? 'border-emerald-400 bg-emerald-500' : 'border-slate-600'
+                      }`}
+                    >
+                      {instanceId === null && <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                        Todas as Instâncias
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Responde em qualquer número conectado desta organização
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Instâncias cadastradas */}
+                  {instances.map((inst) => {
+                    const isSelected = instanceId === inst.id;
+                    const isConnected = inst.status === 'connected';
+                    return (
+                      <div
+                        key={inst.id}
+                        onClick={() => {
+                          setInstanceId(inst.id);
+                          if (pixKeyType === 'phone' && (!pixKey || pixKey === connectedPhone)) {
+                            if (inst.phone_number) setPixKey(inst.phone_number);
+                          }
+                        }}
+                        className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${
+                          isSelected
+                            ? 'bg-emerald-500/10 border-emerald-500/50 shadow-md shadow-emerald-500/5'
+                            : 'bg-[#111726] border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div
+                          className={`mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                            isSelected ? 'border-emerald-400 bg-emerald-500' : 'border-slate-600'
+                          }`}
+                        >
+                          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <p className="text-xs font-bold text-white truncate">
+                              {inst.name || 'WhatsApp'}
+                            </p>
+                            <span
+                              className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold flex items-center gap-1 ${
+                                isConnected
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                                }`}
+                              />
+                              {isConnected ? 'Conectado' : inst.status}
+                            </span>
+                          </div>
+                          <p className="text-[11px] font-mono text-emerald-400 mt-0.5">
+                            +{inst.phone_number || 'Sem número'}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="flex items-center justify-between p-3.5 bg-slate-900/60 border border-slate-800 rounded-2xl">
                 <div>
                   <p className="text-xs font-bold text-white">Status deste Curso</p>
@@ -639,14 +746,25 @@ export const CourseModal: React.FC<CourseModalProps> = ({
               <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                      <Flame className="w-4 h-4" /> Link do WhatsApp Pronto para Anúncios & Bio
-                    </h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                        <Flame className="w-4 h-4" /> Link do WhatsApp Pronto para Anúncios & Bio
+                      </h3>
+                      {selectedInstance ? (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-900 border border-emerald-500/40 text-emerald-300 font-mono font-bold">
+                          📱 {selectedInstance.name} (+{cleanPhone})
+                        </span>
+                      ) : (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 font-mono">
+                          🌐 Padrão (+{cleanPhone})
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[11px] text-slate-300 mt-1">
                       Divulgue este link no Instagram, TikTok, Google ou Facebook Ads. Quando a pessoa clicar, a mensagem
                       já virá preenchida e a IA identificará automaticamente que é este curso!
                     </p>
-                    <div className="mt-2.5 p-2 bg-slate-900/80 rounded-xl border border-slate-800 font-mono text-[11px] text-slate-300 select-all break-all">
+                    <div className="mt-2.5 p-2 bg-slate-900/80 rounded-xl border border-slate-800 font-mono text-[11px] text-emerald-300 select-all break-all">
                       {whatsappLink}
                     </div>
                   </div>

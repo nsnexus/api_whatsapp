@@ -166,6 +166,7 @@ export interface FlowStep {
 export interface Course {
   id: string;
   organization_id: string;
+  instance_id?: string | null;
   name: string;
   slug?: string;
   description: string;

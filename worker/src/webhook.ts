@@ -8,7 +8,7 @@ async function sendEvolutionMedia(
   evolution: EvolutionGoClient,
   instanceName: string,
   cleanPhone: string,
-  mat: { name?: string; url: string; type?: string }
+  mat: { name?: string; url: string; type?: string; caption?: string }
 ) {
   const urlLower = String(mat.url).toLowerCase();
   const isAudio =
@@ -331,6 +331,7 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
           const aiResult = await generateCourseAiReply({
             supabase,
             organizationId,
+            instanceId,
             chatId: chat.id,
             incomingText: extracted.text,
             customerName: contact.name || contact.push_name || undefined,
@@ -338,7 +339,7 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
             historyMessages,
             mediaBase64,
             mediaMimeType,
-            mediaType: extracted.type,
+            mediaType: extracted.type as any,
           });
 
           if (aiResult && !aiResult.ignored) {
