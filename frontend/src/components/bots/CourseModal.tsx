@@ -1387,36 +1387,64 @@ export const CourseModal: React.FC<CourseModalProps> = ({
                 {/* Prévia Visual do PIX que o cliente recebe no WhatsApp */}
                 <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl flex flex-col justify-between">
                   <div>
-                    <p className="text-xs font-bold text-emerald-400 flex items-center gap-1.5 mb-2">
-                      <QrCode className="w-4 h-4" /> Prévia da Mensagem de Cobrança no WhatsApp
+                    <p className="text-xs font-bold text-emerald-400 flex items-center gap-1.5 mb-3">
+                      <QrCode className="w-4 h-4" /> Card Oficial do WhatsApp (Padrão Nativo PIX)
                     </p>
-                    <div className="bg-[#111726] p-3 rounded-xl border border-slate-800 text-[11px] font-mono text-slate-300 space-y-1">
-                      <p className="text-slate-400">💳 *DADOS PARA PAGAMENTO VIA PIX:*</p>
-                      <p>📚 *Curso:* {name || 'Curso Exemplo'}</p>
-                      <p>💰 *Valor:* R$ {Number(price || 0).toFixed(2)}</p>
-                      <p>👤 *Beneficiário:* {pixName || 'Nome'}</p>
-                      <p>🔑 *Chave PIX:* {pixKey || 'Chave...'}</p>
-                    </div>
 
-                    {generatedBrcode && (
-                      <div className="mt-3">
-                        <p className="text-[10px] text-slate-400 font-semibold mb-1">Código Copia e Cola Oficial:</p>
-                        <div className="p-2 bg-slate-950 rounded-lg text-[9px] font-mono text-slate-400 break-all select-all border border-slate-800">
-                          {generatedBrcode}
+                    {/* WhatsApp Bubble Mockup */}
+                    <div className="bg-[#0b141a] p-3 rounded-2xl border border-slate-800 space-y-2">
+                      <div className="bg-[#202c33] rounded-2xl overflow-hidden shadow-lg border border-[#2a3942]">
+                        {/* Top Part: Icon, Name and Key */}
+                        <div className="p-3.5 flex items-center gap-3.5">
+                          {/* Round PIX Green Clover Icon */}
+                          <div className="w-12 h-12 rounded-full bg-[#1b3d39] flex items-center justify-center flex-shrink-0 text-[#00a884]">
+                            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.88 11.54l-2.71 2.71a1.65 1.65 0 01-2.34 0l-2.71-2.71a1.65 1.65 0 010-2.34l2.71-2.71a1.65 1.65 0 012.34 0l2.71 2.71c.65.65.65 1.7 0 2.34z" />
+                            </svg>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-[#e9edef] truncate uppercase tracking-wide">
+                              {pixName || 'HS DIGITAL LTDA'}
+                            </p>
+                            <p className="text-xs text-[#8696a0] truncate mt-0.5">
+                              {pixKeyType === 'phone' && 'Celular: '}
+                              {pixKeyType === 'cpf' && 'CPF: '}
+                              {pixKeyType === 'cnpj' && 'CNPJ: '}
+                              {pixKeyType === 'email' && 'E-mail: '}
+                              {pixKeyType === 'random' && 'Chave aleatória: '}
+                              <span className="font-mono text-[#d1d7db]">{pixKey || '96984361378'}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Bottom Action Button: Copiar chave Pix */}
+                        <div className="border-t border-[#2a3942] py-2.5 px-4 flex items-center justify-center gap-2 text-[#00a884] font-semibold text-xs bg-[#202c33]">
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copiar chave Pix</span>
                         </div>
                       </div>
-                    )}
+
+                      <p className="text-[10px] text-slate-400 text-center pt-1">
+                        ✨ O robô dispara exatamente esse card oficial com o botão nativo do WhatsApp.
+                      </p>
+                    </div>
                   </div>
 
                   <div className="mt-4 flex gap-2">
                     <button
                       type="button"
-                      onClick={handleCopyPix}
-                      disabled={!generatedBrcode}
+                      onClick={() => {
+                        if (pixKey) {
+                          navigator.clipboard.writeText(pixKey);
+                          setCopiedPix(true);
+                          setTimeout(() => setCopiedPix(false), 2000);
+                        }
+                      }}
+                      disabled={!pixKey}
                       className="flex-1 py-2 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-xs hover:bg-emerald-500/20 transition-all flex items-center justify-center gap-1.5 disabled:opacity-40"
                     >
                       {copiedPix ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedPix ? 'Copiado!' : 'Testar Copia e Cola'}</span>
+                      <span>{copiedPix ? 'Chave Copiada!' : 'Copiar Chave para Teste'}</span>
                     </button>
                   </div>
                 </div>

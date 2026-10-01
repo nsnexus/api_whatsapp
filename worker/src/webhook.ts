@@ -448,27 +448,26 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
                   }
                   if (item.pixPayload) {
                     const pix = item.pixPayload;
-                    const pixCode = pix.brCode || pix.pixKey;
-                    const pixInfoMsg = `💳 *DADOS PARA PAGAMENTO VIA PIX:*
-📚 *Curso:* ${pix.courseName}
-💰 *Valor:* R$ ${Number(pix.amount).toFixed(2)}
-👤 *Beneficiário:* ${pix.merchantName || 'NARCISO'}
-🔑 *Chave PIX:* \`${pix.pixKey}\`
-
-👇 *Toque no botão abaixo para copiar o código PIX:*`;
+                    let cleanKey = (pix.pixKey || '').trim();
+                    const keyType = pix.pixKeyType || 'phone';
+                    if (keyType === 'phone' || keyType === 'cpf' || keyType === 'cnpj') {
+                      cleanKey = cleanKey.replace(/\D/g, '');
+                    }
+                    const merchantName = pix.merchantName || 'NARCISO';
 
                     try {
-                      // Dispara botão interativo nativo do WhatsApp com ação cta_copy
+                      // Dispara o botão nativo oficial do WhatsApp (ícone verde PIX, beneficiário e botão "Copiar chave Pix")
                       await evolution.sendButtons(instanceName, {
                         number: cleanPhone,
-                        title: `💳 Pagamento PIX - ${pix.courseName}`,
-                        description: pixInfoMsg,
-                        footer: 'Toque para copiar a chave PIX e pagar no banco',
+                        title: '',
+                        description: '',
                         buttons: [
                           {
-                            type: 'copy',
-                            displayText: 'Copiar Chave PIX',
-                            copyCode: pixCode,
+                            type: 'pix',
+                            currency: 'BRL',
+                            name: merchantName,
+                            keyType: keyType,
+                            key: cleanKey,
                           },
                         ],
                       });
@@ -480,16 +479,17 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
                         direction: 'outbound',
                         sender_type: 'bot',
                         type: 'text',
-                        content: `${pixInfoMsg}\n\n[Botão: Copiar Chave PIX]`,
+                        content: `[Chave PIX (${keyType.toUpperCase()}): ${cleanKey} - ${merchantName}]`,
                         status: 'sent',
                       });
-                      lastSentText = pixInfoMsg;
+                      lastSentText = `[Chave PIX: ${cleanKey}]`;
                       await new Promise((r) => setTimeout(r, 800));
                     } catch (btnErr) {
                       console.warn('Fallback: Erro ao enviar botão nativo de PIX, enviando texto:', btnErr);
+                      const fallbackText = `💳 *CHAVE PIX (${keyType.toUpperCase()}):*\n\`${cleanKey}\`\n\n👤 *Beneficiário:* ${merchantName}`;
                       await evolution.sendText(instanceName, {
                         number: cleanPhone,
-                        text: pixInfoMsg,
+                        text: fallbackText,
                       });
                       await supabase.from('messages').insert({
                         organization_id: organizationId,
@@ -498,29 +498,10 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
                         direction: 'outbound',
                         sender_type: 'bot',
                         type: 'text',
-                        content: pixInfoMsg,
+                        content: fallbackText,
                         status: 'sent',
                       });
-                      lastSentText = pixInfoMsg;
-                      await new Promise((r) => setTimeout(r, 800));
-                    }
-
-                    // Envia também mensagem exclusiva apenas com o código para cópia imediata com 1 toque
-                    if (pixCode) {
-                      await evolution.sendText(instanceName, {
-                        number: cleanPhone,
-                        text: pixCode,
-                      });
-                      await supabase.from('messages').insert({
-                        organization_id: organizationId,
-                        chat_id: chat.id,
-                        instance_id: instanceId,
-                        direction: 'outbound',
-                        sender_type: 'bot',
-                        type: 'text',
-                        content: pixCode,
-                        status: 'sent',
-                      });
+                      lastSentText = fallbackText;
                       await new Promise((r) => setTimeout(r, 800));
                     }
                   }
@@ -624,41 +605,56 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
               const pixAction = aiResult.actions.find((a) => a.type === 'pix_generated');
               if (pixAction && pixAction.payload) {
                 const pix = pixAction.payload;
-                const pixCode = pix.brCode || pix.pixKey;
-                const pixInfoMsg = `💳 *DADOS PARA PAGAMENTO VIA PIX:*
-📚 *Curso:* ${pix.courseName}
-💰 *Valor:* R$ ${Number(pix.amount).toFixed(2)}
-👤 *Beneficiário:* ${pix.merchantName || 'NARCISO'}
-🔑 *Chave PIX:* \`${pix.pixKey}\`
-
-👇 *Toque no botão abaixo para copiar o código PIX:*`;
+                let cleanKey = (pix.pixKey || '').trim();
+                const keyType = pix.pixKeyType || 'phone';
+                if (keyType === 'phone' || keyType === 'cpf' || keyType === 'cnpj') {
+                  cleanKey = cleanKey.replace(/\D/g, '');
+                }
+                const merchantName = pix.merchantName || 'NARCISO';
 
                 try {
+                  // Dispara o botão nativo oficial do WhatsApp (ícone verde PIX, beneficiário e botão "Copiar chave Pix")
                   await evolution.sendButtons(instanceName, {
                     number: cleanPhone,
-                    title: `💳 Pagamento PIX - ${pix.courseName}`,
-                    description: pixInfoMsg,
-                    footer: 'Toque para copiar a chave PIX e pagar no banco',
+                    title: '',
+                    description: '',
                     buttons: [
                       {
-                        type: 'copy',
-                        displayText: 'Copiar Chave PIX',
-                        copyCode: pixCode,
+                        type: 'pix',
+                        currency: 'BRL',
+                        name: merchantName,
+                        keyType: keyType,
+                        key: cleanKey,
                       },
                     ],
                   });
-                } catch (btnErr) {
-                  await evolution.sendText(instanceName, {
-                    number: cleanPhone,
-                    text: pixInfoMsg,
-                  });
-                }
 
-                if (pixCode) {
-                  // Envia UMA mensagem exclusiva apenas com o código puro para o cliente só tocar e copiar
+                  await supabase.from('messages').insert({
+                    organization_id: organizationId,
+                    chat_id: chat.id,
+                    instance_id: instanceId,
+                    direction: 'outbound',
+                    sender_type: 'bot',
+                    type: 'text',
+                    content: `[Chave PIX (${keyType.toUpperCase()}): ${cleanKey} - ${merchantName}]`,
+                    status: 'sent',
+                  });
+                } catch (btnErr) {
+                  console.warn('Fallback: Erro ao enviar botão nativo de PIX:', btnErr);
+                  const fallbackText = `💳 *CHAVE PIX (${keyType.toUpperCase()}):*\n\`${cleanKey}\`\n\n👤 *Beneficiário:* ${merchantName}`;
                   await evolution.sendText(instanceName, {
                     number: cleanPhone,
-                    text: pixCode,
+                    text: fallbackText,
+                  });
+                  await supabase.from('messages').insert({
+                    organization_id: organizationId,
+                    chat_id: chat.id,
+                    instance_id: instanceId,
+                    direction: 'outbound',
+                    sender_type: 'bot',
+                    type: 'text',
+                    content: fallbackText,
+                    status: 'sent',
                   });
                 }
               }

@@ -91,20 +91,25 @@ export class EvolutionGoClient {
   }
 
   /**
-   * Envia Botões Interativos do WhatsApp (com suporte nativo a cta_copy para PIX, reply e url)
+   * Envia Botões Interativos do WhatsApp (com suporte nativo a PIX com card verde, cta_copy, reply e url)
    */
   async sendButtons(instanceName: string, params: {
     number: string;
-    title: string;
-    description: string;
+    title?: string;
+    description?: string;
     footer?: string;
     buttons: Array<{
       type: 'reply' | 'copy' | 'url' | 'call' | 'pix';
-      displayText: string;
+      displayText?: string;
       copyCode?: string;
       url?: string;
       phoneNumber?: string;
       id?: string;
+      currency?: string;
+      name?: string;
+      keyType?: string;
+      key?: string;
+      amount?: number;
     }>;
   }) {
     const cleanNumber = toEvolutionNumber(params.number);
@@ -113,8 +118,8 @@ export class EvolutionGoClient {
       method: 'POST',
       body: JSON.stringify({
         number: cleanNumber,
-        title: params.title,
-        description: params.description,
+        title: params.title || '',
+        description: params.description || '',
         footer: params.footer,
         buttons: params.buttons,
         delay: 1200,
