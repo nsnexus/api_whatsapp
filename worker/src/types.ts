@@ -5,6 +5,14 @@ export interface Env {
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
   R2_PUBLIC_URL: string;
+  EFI_PROXY_URL?: string;
+  EFI_PROXY_SECRET?: string;
+  EFI_CLIENT_ID?: string;
+  EFI_CLIENT_SECRET?: string;
+  EFI_PIX_KEY?: string;
+  EFI_ENV?: string;
+  NSNEXUS_GATEWAY_URL?: string;
+  NSNEXUS_GATEWAY_API_KEY?: string;
 }
 
 export interface EvolutionWebhookPayload {

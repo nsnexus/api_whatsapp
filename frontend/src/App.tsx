@@ -258,8 +258,15 @@ export const App: React.FC = () => {
     };
     window.addEventListener('hashchange', handleHashChange);
 
-    // Volta do login com Google ou troca de sessão
-    const cameFromOAuth = new URLSearchParams(window.location.search).has('code');
+    // Volta do login com Google: consome o parâmetro code uma única vez
+    const urlParams = new URLSearchParams(window.location.search);
+    let isInitialOAuthLogin = urlParams.has('code');
+    if (isInitialOAuthLogin) {
+      urlParams.delete('code');
+      const cleanSearch = urlParams.toString() ? `?${urlParams.toString()}` : '';
+      window.history.replaceState(null, '', window.location.pathname + cleanSearch + (window.location.hash || '#app'));
+    }
+
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       const user = session?.user;
       const orgId = await syncUserOrg(user);
@@ -269,7 +276,9 @@ export const App: React.FC = () => {
         setInstances([]);
       }
 
-      if (cameFromOAuth && session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+      // Redireciona apenas uma única vez na conclusão do OAuth, sem interferir em renovações periódicas de token
+      if (isInitialOAuthLogin && session && event === 'SIGNED_IN') {
+        isInitialOAuthLogin = false;
         window.history.replaceState(null, '', window.location.pathname + '#app');
         setCurrentTab('instances');
       }

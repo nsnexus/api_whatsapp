@@ -22,3 +22,14 @@ SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdX
 
 # URL pública para servir mídias do bucket R2 (configurado no Cloudflare R2 custom domain)
 R2_PUBLIC_URL = "https://media.seucrm.com.br"
+
+# Gateway Centralizado Pix NSNexus Pay (Hub NSMusic)
+NSNEXUS_GATEWAY_URL = "https://nsmusic.nsnexus.com.br"
+NSNEXUS_GATEWAY_API_KEY = "548062f96c4821e8822724f2405ca31e39c8eb38c88db390ab4f008106d29f9d"
+
+# Gateway de Pagamento Pix Efí via Proxy mTLS Fly.io
+EFI_PROXY_URL = "https://efi-proxy-fly.fly.dev"
+EFI_ENV = "production"
+EFI_PIX_KEY = "68471413000198"
+# Os segredos EFI_PROXY_SECRET, EFI_CLIENT_ID e EFI_CLIENT_SECRET podem ser definidos com:
+# npx wrangler secret put EFI_PROXY_SECRET

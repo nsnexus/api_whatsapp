@@ -6,6 +6,7 @@ import { importChats } from './sync';
 import { getChatMessages, serveWhatsAppMedia } from './messages';
 import { uploadMediaToR2, base64ToUint8Array } from './storage';
 import { generateCourseAiReply } from './ai';
+import { createPixCharge, getChargeStatus } from './efi';
 
 // Helper de Cabeçalhos CORS
 function corsHeaders(): HeadersInit {
@@ -622,6 +623,53 @@ export default {
 
         if (toggleErr) return jsonResponse({ error: toggleErr.message }, 500);
         return jsonResponse({ chat: updatedChat });
+      }
+
+      // 17. Rota: Gerar Cobrança Pix via Efí (mTLS via Proxy Fly.io)
+      if (url.pathname === '/api/payments/pix' && method === 'POST') {
+        const body = (await request.json()) as {
+          orderId?: string;
+          instanceCode?: string;
+          planId?: string;
+          planName?: string;
+          amount: number;
+          description?: string;
+        };
+
+        const amount = Number(body.amount);
+        if (!amount || amount <= 0) {
+          return jsonResponse({ error: 'Valor inválido para a cobrança.' }, 400);
+        }
+
+        const orderId = body.instanceCode || body.orderId || `NEXUS_${Date.now()}`;
+        const description = body.description || `NexusAPI - ${body.planName || 'Assinatura'} (${orderId})`;
+
+        const charge = await createPixCharge(
+          {
+            orderId,
+            amount,
+            description,
+          },
+          env
+        );
+
+        return jsonResponse({
+          ok: true,
+          ...charge,
+          amount,
+        });
+      }
+
+      // 18. Rota: Consultar Status de Cobrança Pix na Efí
+      const pixStatusMatch = url.pathname.match(/^\/api\/payments\/pix\/status\/([^/]+)$/);
+      if (pixStatusMatch && method === 'GET') {
+        const txid = pixStatusMatch[1];
+        const statusResult = await getChargeStatus(txid, env);
+        return jsonResponse({
+          ok: true,
+          txid,
+          ...statusResult,
+        });
       }
 
       // Rota não encontrada

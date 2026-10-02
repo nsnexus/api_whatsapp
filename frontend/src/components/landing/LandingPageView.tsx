@@ -28,7 +28,7 @@ import {
   Webhook
 } from 'lucide-react';
 import { CheckoutModal } from '../wapi/CheckoutModal';
-import { HeroDemo } from './HeroDemo';
+import { NexusHero } from './NexusHero';
 
 interface LandingPageViewProps {
   onOpenAuth: (mode: 'login' | 'register') => void;
@@ -392,73 +392,8 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
       {/* CONTEÚDO PRINCIPAL (MAIN SEMÂNTICO PARA SEO) */}
       <main id="main-content">
-        {/* HERO SECTION */}
-        <section aria-labelledby="hero-title" className="relative pt-12 pb-20 md:pt-20 md:pb-28 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          {/* Badge de Lançamento */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold mb-7 shadow-inner">
-            <Zap className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400" />
-            <span>API REST v2.0 • Clusters Dedicados & Webhooks em Alta Performance</span>
-          </div>
-
-          {/* Headline Principal */}
-          <h1 id="hero-title" className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-white tracking-tight leading-[1.1] max-w-5xl mx-auto">
-            A API de WhatsApp mais <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">rápida, estável e simples</span> para suas automações.
-          </h1>
-
-          {/* Subheadline Focada em Devs & Automações */}
-          <p className="mt-6 text-base sm:text-lg md:text-xl text-slate-300 max-w-3xl mx-auto leading-relaxed font-normal">
-            Conecte qualquer sistema, CRM, <b>n8n</b> ou <b>Typebot</b> ao WhatsApp em minutos. 
-            Envie textos, áudios PTT gravados na hora, mídias e receba Webhooks em tempo real com alta disponibilidade e zero burocracia.
-          </p>
-
-          {/* Botões de Conversão */}
-          <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <button
-              type="button"
-              onClick={() => onOpenAuth('register')}
-              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 text-slate-950 font-black text-sm md:text-base hover:opacity-95 transition-all shadow-xl shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2.5"
-            >
-              <span>Testar Grátis por 3 Dias</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={onOpenDocs}
-              className="w-full sm:w-auto px-7 py-4 rounded-2xl bg-slate-900/80 hover:bg-slate-800 text-slate-200 font-bold text-sm border border-slate-700/80 hover:border-slate-600 transition-all flex items-center justify-center gap-2 shadow-lg"
-            >
-              <Terminal className="w-4 h-4 text-emerald-400" />
-              <span>Ver Documentação REST</span>
-            </button>
-          </div>
-
-          {/* Prova Rápida / Badges */}
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-y-2 gap-x-6 text-xs text-slate-400">
-            <span className="flex items-center gap-1.5">
-              <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
-              Conexão via QR Code em 10s
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
-              Webhooks em &lt; 150ms
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
-              100% Compatível com n8n & Make
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
-              Mensagens Ilimitadas (sem custo Meta)
-            </span>
-          </div>
-
-          {/* SIMULADOR INTERATIVO DA API (HERO DEMO) */}
-          <div className="mt-14 relative z-10">
-            <HeroDemo />
-          </div>
-        </div>
-      </section>
+        {/* HERO SECTION INTERATIVA (NOVO DESIGN COM CANVAS, 3D TILT E CÓDIGO) */}
+        <NexusHero onOpenAuth={onOpenAuth} onOpenDocs={onOpenDocs} />
 
       {/* STRIP DE ESTATÍSTICAS */}
       <section className="py-12 border-y border-slate-800/80 bg-[#0b101e]/60 relative z-10">

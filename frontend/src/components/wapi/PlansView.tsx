@@ -10,9 +10,12 @@ import {
   CreditCard,
   ExternalLink
 } from 'lucide-react';
+import { CheckoutModal } from './CheckoutModal';
 
 export const PlansView: React.FC = () => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [selectedPlanForCheckout, setSelectedPlanForCheckout] = useState('1_instancia');
 
   const plans = [
     {
@@ -211,11 +214,11 @@ export const PlansView: React.FC = () => {
                 {/* Botão de Assinatura */}
                 <div className="pt-6 mt-6 border-t border-slate-800">
                   <button
-                    onClick={() =>
-                      alert(
-                        `Simulação: Direcionando para checkout do plano "${plan.name}" (R$ ${price}/mês). Você pode plugar Stripe ou Mercado Pago!`
-                      )
-                    }
+                    onClick={() => {
+                      const planKey = plan.id === 'api_combo_5' ? 'combo_5' : plan.id === 'api_10' ? '10_instancias' : '1_instancia';
+                      setSelectedPlanForCheckout(planKey);
+                      setIsCheckoutOpen(true);
+                    }}
                     className={`w-full py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-98 ${
                       plan.highlight
                         ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
@@ -231,6 +234,13 @@ export const PlansView: React.FC = () => {
           })}
         </div>
       </div>
+
+      {/* Modal de Checkout Pix */}
+      <CheckoutModal
+        isOpen={isCheckoutOpen}
+        onClose={() => setIsCheckoutOpen(false)}
+        selectedPlan={selectedPlanForCheckout}
+      />
     </div>
   );
 };

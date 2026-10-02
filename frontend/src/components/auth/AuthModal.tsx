@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Mail, Lock, User, ArrowRight, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, Mail, Lock, User, ArrowRight, Loader2, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface AuthModalProps {
@@ -19,6 +19,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -65,6 +68,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     if (password.length < 6) {
       setErrorMessage('A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+
+    if (mode === 'register' && password !== confirmPassword) {
+      setErrorMessage('As senhas não coincidem. Digite a mesma senha nos dois campos.');
       return;
     }
 
@@ -133,9 +141,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn overflow-y-auto">
       <div 
-        className="w-full max-w-md bg-[#0e131f] border border-slate-800 rounded-3xl shadow-2xl overflow-hidden relative"
+        className="w-full max-w-md bg-[#0e131f] border border-slate-800 rounded-3xl shadow-2xl overflow-hidden relative my-auto max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Glow Superior */}
@@ -149,7 +157,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <X className="w-5 h-5" />
         </button>
 
-        <div className="p-6 md:p-8 space-y-6">
+        <div className="p-6 md:p-8 space-y-5 overflow-y-auto">
           {/* Topo / Logo */}
           <div className="text-center space-y-2">
             <img
@@ -174,6 +182,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               onClick={() => {
                 setMode('register');
                 setErrorMessage(null);
+                setConfirmPassword('');
               }}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
                 mode === 'register'
@@ -188,6 +197,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               onClick={() => {
                 setMode('login');
                 setErrorMessage(null);
+                setConfirmPassword('');
               }}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
                 mode === 'login'
@@ -215,7 +225,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           )}
 
           {/* Formulário E-mail / Senha */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3.5">
             {mode === 'register' && (
               <div>
                 <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
@@ -259,15 +269,50 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div className="relative">
                 <Lock className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   placeholder="Mínimo 6 caracteres"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-[#161c2d] border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-[#161c2d] border border-slate-800 rounded-xl pl-10 pr-10 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 p-0.5 text-slate-400 hover:text-slate-200 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
+
+            {mode === 'register' && (
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
+                  Confirmar Senha
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    required
+                    placeholder="Repita sua senha"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full bg-[#161c2d] border border-slate-800 rounded-xl pl-10 pr-10 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-2.5 p-0.5 text-slate-400 hover:text-slate-200 transition-colors"
+                    tabIndex={-1}
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"
@@ -286,11 +331,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </form>
 
           {/* Separador */}
-          <div className="relative flex items-center justify-center my-2">
-            <div className="border-t border-slate-800 w-full" />
-            <span className="bg-[#0e131f] px-3 text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+          <div className="flex items-center gap-3 my-2">
+            <div className="flex-1 border-t border-slate-800" />
+            <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold whitespace-nowrap">
               ou continue com
             </span>
+            <div className="flex-1 border-t border-slate-800" />
           </div>
 
           {/* Botão Oficial: Login com Google */}

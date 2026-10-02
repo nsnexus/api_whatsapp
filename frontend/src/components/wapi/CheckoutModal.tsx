@@ -8,11 +8,12 @@ import {
   ArrowRight, 
   Clock, 
   CheckCircle2, 
-  ChevronLeft,
-  Smartphone,
-  Calculator,
-  Lock,
-  ExternalLink
+  ChevronLeft, 
+  Calculator, 
+  Lock, 
+  Sparkles,
+  ShieldCheck,
+  RefreshCw
 } from 'lucide-react';
 import { Instance } from '../../types';
 
@@ -31,17 +32,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   selectedPlan,
   onPaymentSuccess
 }) => {
-  // Telas: 'selection' (tela igualzinha ao print), 'pix_details', 'card_details', 'success'
-  const [currentStep, setCurrentStep] = useState<'selection' | 'pix_details' | 'card_details' | 'success'>('selection');
+  // Telas: 'selection' (escolha de plano/método), 'pix_details', 'success'
+  const [currentStep, setCurrentStep] = useState<'selection' | 'pix_details' | 'success'>('selection');
   const [copiedPix, setCopiedPix] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [timeLeft, setTimeLeft] = useState(900); // 15 minutos em segundos
 
-  // Dados do formulário de cartão
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardHolder, setCardHolder] = useState('');
-  const [cardExp, setCardExp] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
+  // Estados do Pix Dinâmico da Efí (via Proxy Fly.io)
+  const [isLoadingPix, setIsLoadingPix] = useState(false);
+  const [dynamicPixCode, setDynamicPixCode] = useState<string>('');
+  const [dynamicQrCodeUrl, setDynamicQrCodeUrl] = useState<string>('');
+  const [txid, setTxid] = useState<string>('');
+  const [provider, setProvider] = useState<'efi' | 'static'>('efi');
 
   // Parâmetros do cálculo de dias
   const currentDays = 10;
@@ -59,38 +61,84 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     return '1_instancia';
   });
 
-  const planInfo: Record<string, { name: string; priceFormatted: string; priceNumber: number; pixCode: string }> = {
+  const planInfo: Record<string, { name: string; priceFormatted: string; priceNumber: number; fallbackPixCode: string }> = {
     '1_instancia': {
       name: '1 Instância',
       priceFormatted: 'R$ 19,90',
       priceNumber: 19.90,
-      pixCode: '00020126480014br.gov.bcb.pix0126narcisofelizardo@gmail.com520400005303986540519.905802BR5914NARCISO SANTOS6009SAO PAULO62070503***630425FA',
+      fallbackPixCode: '00020126480014br.gov.bcb.pix012668471413000198520400005303986540519.905802BR5914NARCISO SANTOS6009SAO PAULO62070503***630425FA',
     },
     'combo_5': {
       name: 'Combo 5 Instâncias',
       priceFormatted: 'R$ 69,90',
       priceNumber: 69.90,
-      pixCode: '00020126480014br.gov.bcb.pix0126narcisofelizardo@gmail.com520400005303986540569.905802BR5914NARCISO SANTOS6009SAO PAULO62070503***6304CA22',
+      fallbackPixCode: '00020126480014br.gov.bcb.pix012668471413000198520400005303986540569.905802BR5914NARCISO SANTOS6009SAO PAULO62070503***6304CA22',
     },
     '10_instancias': {
       name: '10 Instâncias',
       priceFormatted: 'R$ 99,90',
       priceNumber: 99.90,
-      pixCode: '00020126480014br.gov.bcb.pix0126narcisofelizardo@gmail.com520400005303986540599.905802BR5914NARCISO SANTOS6009SAO PAULO62070503***63049A56',
+      fallbackPixCode: '00020126480014br.gov.bcb.pix012668471413000198520400005303986540599.905802BR5914NARCISO SANTOS6009SAO PAULO62070503***63049A56',
     },
     '2_instancias': {
       name: '2 Instâncias',
       priceFormatted: 'R$ 29,90',
       priceNumber: 29.90,
-      pixCode: '00020126480014br.gov.bcb.pix0126narcisofelizardo@gmail.com520400005303986540529.905802BR5914NARCISO SANTOS6009SAO PAULO62070503***630495F4',
+      fallbackPixCode: '00020126480014br.gov.bcb.pix012668471413000198520400005303986540529.905802BR5914NARCISO SANTOS6009SAO PAULO62070503***630495F4',
     },
   };
 
   const currentPlan = planInfo[selectedPlanId] || planInfo['1_instancia'];
   const priceFormatted = currentPlan.priceFormatted;
   const priceNumber = currentPlan.priceNumber;
-  const pixCode = currentPlan.pixCode;
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(pixCode)}&margin=8`;
+
+  const activePixCode = dynamicPixCode || currentPlan.fallbackPixCode;
+  const activeQrCodeUrl = dynamicQrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(activePixCode)}&margin=8`;
+
+  const workerUrl = import.meta.env.VITE_WORKER_API_URL || 'https://nexusapi.nsnexus.com.br';
+
+  // Buscar cobrança Pix dinâmica na Efí (via proxy Fly.io)
+  const fetchPixCharge = async () => {
+    setIsLoadingPix(true);
+    try {
+      const res = await fetch(`${workerUrl}/api/payments/pix`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instanceCode,
+          planId: selectedPlanId,
+          planName: currentPlan.name,
+          amount: priceNumber,
+          description: `NexusAPI - ${currentPlan.name} (${instanceCode})`
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.pixCopiaECola) {
+          setDynamicPixCode(data.pixCopiaECola);
+          setDynamicQrCodeUrl(data.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(data.pixCopiaECola)}&margin=8`);
+          setTxid(data.txid || '');
+          setProvider(data.provider || 'efi');
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('[Checkout] Erro ao buscar Pix dinâmico da Efí, usando fallback local:', err);
+    } finally {
+      setIsLoadingPix(false);
+    }
+
+    // Fallback padrão
+    setDynamicPixCode(currentPlan.fallbackPixCode);
+    setDynamicQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(currentPlan.fallbackPixCode)}&margin=8`);
+  };
+
+  // Ao entrar nos detalhes do Pix, gera o Pix na Efí
+  const handleSelectPix = () => {
+    setCurrentStep('pix_details');
+    fetchPixCharge();
+  };
 
   // Temporizador do PIX (15 min)
   useEffect(() => {
@@ -101,6 +149,31 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     return () => clearInterval(timer);
   }, [isOpen, currentStep]);
 
+  // Polling automático para verificar liquidação na Efí
+  useEffect(() => {
+    if (!isOpen || currentStep !== 'pix_details' || !txid || provider !== 'efi') return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${workerUrl}/api/payments/pix/status/${txid}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.isPaid || data.status === 'CONCLUIDA') {
+            clearInterval(interval);
+            setCurrentStep('success');
+            if (onPaymentSuccess && instance) {
+              onPaymentSuccess(instance.id, currentPlan.name);
+            }
+          }
+        }
+      } catch (e) {
+        // Falhas transitórias no polling são ignoradas
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [isOpen, currentStep, txid, provider, instance, currentPlan.name, onPaymentSuccess, workerUrl]);
+
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
@@ -108,7 +181,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   const handleCopyPix = () => {
-    navigator.clipboard.writeText(pixCode);
+    navigator.clipboard.writeText(activePixCode);
     setCopiedPix(true);
     setTimeout(() => setCopiedPix(false), 2500);
   };
@@ -129,6 +202,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (isOpen) {
       setCurrentStep('selection');
       setTimeLeft(900);
+      setDynamicPixCode('');
+      setDynamicQrCodeUrl('');
+      setTxid('');
     }
   }, [isOpen]);
 
@@ -147,11 +223,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         </button>
 
         {/* ======================================================== */}
-        {/* ETAPA 1: TELA IDÊNTICA AO PRINT ENVIADO PELO USUÁRIO      */}
+        {/* ETAPA 1: TELA DE SELEÇÃO E CÁLCULO DE DIAS              */}
         {/* ======================================================== */}
         {currentStep === 'selection' && (
           <div className="space-y-6">
-            {/* Ícone no Topo (Máquina de Cartão / Calculadora verde com glow) */}
+            {/* Ícone no Topo (Calculadora verde com glow) */}
             <div className="flex justify-center">
               <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-500/10">
                 <Calculator className="w-6 h-6" />
@@ -164,7 +240,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 Assinar Instância
               </h2>
               <p className="text-[13px] text-slate-300 leading-relaxed max-w-md mx-auto">
-                Escolha a forma de pagamento para usar a isnstância{' '}
+                Escolha o plano e a forma de pagamento para a instância{' '}
                 <span className="inline-block px-2.5 py-0.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 text-emerald-400 font-mono font-bold text-xs">
                   {instanceCode}
                 </span>{' '}
@@ -220,7 +296,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </button>
             </div>
 
-            {/* Seção da Linha do Tempo e Cálculo de Dias (EXATO ao print) */}
+            {/* Seção da Linha do Tempo e Cálculo de Dias */}
             <div className="space-y-3 pt-1">
               <p className="text-[12px] text-slate-300 text-center font-medium">
                 Se renovar a instância <strong className="text-white font-bold">com PIX por 30 dias</strong>, o novo prazo será calculado assim:
@@ -234,22 +310,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
               {/* Barra Visual com os Círculos (10d -> 40d) */}
               <div className="relative flex items-center justify-between px-6 py-2">
-                {/* Linha de Conexão Fina */}
                 <div className="absolute left-10 right-10 h-[2px] bg-slate-700/80 z-0">
                   <div className="h-full bg-gradient-to-r from-blue-500 via-emerald-500 to-emerald-400" style={{ width: '100%' }} />
                 </div>
 
-                {/* Bolinha Azul: 10d */}
                 <div className="relative z-10 w-9 h-9 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-lg shadow-blue-500/40 ring-4 ring-[#141926]">
                   10d
                 </div>
 
-                {/* Bolinha Central: Seta verde */}
                 <div className="relative z-10 w-7 h-7 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-md shadow-emerald-500/30 ring-4 ring-[#141926]">
                   <ArrowRight className="w-3.5 h-3.5 stroke-[3]" />
                 </div>
 
-                {/* Bolinha Verde: 40d com Glow Verde intenso */}
                 <div className="relative z-10 w-11 h-11 rounded-full bg-emerald-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-xl shadow-emerald-500/50 ring-4 ring-[#141926]">
                   40d
                 </div>
@@ -257,71 +329,80 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
               {/* Rótulos Inferiores */}
               <div className="flex justify-between items-center text-[12px] px-3">
-                <span className="text-slate-400">Total após renovação: 40 dias</span>
+                <span className="text-slate-400">Total após renovação: {totalDays} dias</span>
                 <span className="text-slate-500 font-bold text-[11px] uppercase tracking-wider">TOTAL</span>
               </div>
 
               <div className="text-[12px] text-slate-300 text-center space-y-1 pt-1 leading-relaxed">
                 <p>
-                  Ou seja, sua instância terá <strong className="text-white font-bold">40 dias no total</strong> antes de expirar novamente.
+                  Sua instância terá <strong className="text-white font-bold">{totalDays} dias no total</strong> antes de expirar novamente.
                 </p>
                 <p className="text-slate-400">
-                  Se você concorda e deseja renovar, <strong className="text-slate-200">escolha a opção PIX</strong>.
+                  Para liberação automática instantânea, <strong className="text-slate-200">escolha a opção PIX</strong>.
                 </p>
               </div>
             </div>
 
-            {/* Opções de Pagamento (PIX e CARTÃO) */}
+            {/* Opções de Pagamento (PIX ATIVO e CARTÃO EM BREVE) */}
             <div className="space-y-3 pt-2">
-              {/* Opção 1: Pagar com PIX */}
+              {/* Opção 1: Pagar com PIX (Ativo com Efí / Proxy Fly.io) */}
               <button
                 type="button"
-                onClick={() => setCurrentStep('pix_details')}
-                className="w-full flex items-center justify-between p-4 rounded-2xl border border-slate-800/90 bg-[#192032]/80 hover:bg-[#1f283e] hover:border-emerald-500/50 transition-all text-left group active:scale-[0.99]"
+                onClick={handleSelectPix}
+                className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-emerald-500/60 bg-[#192032]/90 hover:bg-[#1f283e] hover:border-emerald-400 transition-all text-left group active:scale-[0.99] shadow-lg shadow-emerald-500/10"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:bg-emerald-500/20 transition-colors">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:bg-emerald-500/25 transition-colors">
                     <QrCode className="w-6 h-6" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-white group-hover:text-emerald-400 transition-colors">
-                      Pagar com PIX
-                    </h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-black text-white group-hover:text-emerald-400 transition-colors">
+                        Pagar com PIX
+                      </h4>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px] border border-emerald-500/30">
+                        Aprovação Automática
+                      </span>
+                    </div>
                     <p className="text-xs text-slate-400">
-                      Liberação instantânea
+                      QR Code dinâmico com compensação instantânea
                     </p>
                   </div>
                 </div>
 
-                <div className="w-6 h-6 rounded-full border border-slate-700 group-hover:border-emerald-500 flex items-center justify-center transition-colors">
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="w-6 h-6 rounded-full border-2 border-emerald-500 flex items-center justify-center bg-emerald-500/10">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
                 </div>
               </button>
 
-              {/* Opção 2: Pagar com CARTÃO (Via Stripe) */}
-              <button
-                type="button"
-                onClick={() => setCurrentStep('card_details')}
-                className="w-full flex items-center justify-between p-4 rounded-2xl border border-slate-800/90 bg-[#192032]/80 hover:bg-[#1f283e] hover:border-blue-500/50 transition-all text-left group active:scale-[0.99]"
+              {/* Opção 2: Pagar com CARTÃO (Marcado como Em Breve) */}
+              <div
+                className="w-full flex items-center justify-between p-4 rounded-2xl border border-slate-800/60 bg-[#161c2c]/40 opacity-60 cursor-not-allowed select-none"
+                title="Pagamento com Cartão de Crédito estará disponível em breve. Por enquanto, utilize o PIX com aprovação instantânea."
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 transition-colors">
+                  <div className="w-12 h-12 rounded-xl bg-slate-800/80 border border-slate-700/50 flex items-center justify-center text-slate-500">
                     <CreditCard className="w-6 h-6" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">
-                      Pagar com CARTÃO
-                    </h4>
-                    <p className="text-xs text-slate-400">
-                      Via Stripe checkout
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-slate-300">
+                        Pagar com CARTÃO
+                      </h4>
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 font-extrabold text-[10px] uppercase">
+                        Em breve
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Em breve • Por favor, use o PIX com liberação imediata
                     </p>
                   </div>
                 </div>
 
-                <div className="w-6 h-6 rounded-full border border-slate-700 group-hover:border-blue-500 flex items-center justify-center transition-colors">
-                  <div className="w-2.5 h-2.5 rounded-full bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="p-1 rounded-lg text-slate-600">
+                  <Lock className="w-4 h-4" />
                 </div>
-              </button>
+              </div>
             </div>
 
             {/* Botão Cancelar Centralizado */}
@@ -359,20 +440,32 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
 
             <div className="text-center space-y-1">
-              <h3 className="text-lg font-bold text-white">Escaneie o QR Code PIX</h3>
+              <h3 className="text-lg font-bold text-white flex items-center justify-center gap-2">
+                <span>Escaneie o QR Code PIX</span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
+                  Efí Pay
+                </span>
+              </h3>
               <p className="text-xs text-slate-400">
                 Abra o app do seu banco e aponte a câmera para pagar
               </p>
             </div>
 
-            {/* Imagem do QR Code PIX */}
+            {/* Imagem do QR Code PIX com Loading State */}
             <div className="flex justify-center">
-              <div className="bg-white p-3 rounded-2xl shadow-xl shadow-emerald-500/10 border-4 border-emerald-500/30">
-                <img
-                  src={qrCodeUrl}
-                  alt="QR Code PIX"
-                  className="w-48 h-48 object-contain"
-                />
+              <div className="relative bg-white p-3 rounded-2xl shadow-xl shadow-emerald-500/10 border-4 border-emerald-500/30 min-w-[200px] min-h-[200px] flex items-center justify-center">
+                {isLoadingPix ? (
+                  <div className="flex flex-col items-center justify-center gap-3 p-6 text-slate-800">
+                    <RefreshCw className="w-8 h-8 animate-spin text-emerald-600" />
+                    <span className="text-xs font-bold font-mono">Gerando cobrança na Efí...</span>
+                  </div>
+                ) : (
+                  <img
+                    src={activeQrCodeUrl}
+                    alt="QR Code PIX"
+                    className="w-48 h-48 object-contain"
+                  />
+                )}
               </div>
             </div>
 
@@ -384,14 +477,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
             {/* Campo Copia e Cola */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                Código PIX Copia e Cola:
+              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                <span>Código PIX Copia e Cola:</span>
+                {txid && (
+                  <span className="text-[10px] text-slate-500 font-mono lowercase">
+                    id: {txid.slice(0, 10)}...
+                  </span>
+                )}
               </label>
               <div className="relative">
                 <input
                   type="text"
                   readOnly
-                  value={pixCode}
+                  value={activePixCode}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-[11px] font-mono text-slate-300 pr-24 select-all outline-none"
                 />
                 <button
@@ -415,7 +513,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               {isVerifying ? (
                 <>
                   <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                  <span>Verificando compensação no Banco Central...</span>
+                  <span>Verificando compensação bancária...</span>
                 </>
               ) : (
                 <>
@@ -428,131 +526,42 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         )}
 
         {/* ======================================================== */}
-        {/* ETAPA 3: STRIPE CHECKOUT / CARTÃO                        */}
-        {/* ======================================================== */}
-        {currentStep === 'card_details' && (
-          <div className="space-y-5 animate-fadeIn">
-            {/* Header com Voltar */}
-            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-              <button
-                type="button"
-                onClick={() => setCurrentStep('selection')}
-                className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                <span>Voltar às opções</span>
-              </button>
-
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-bold font-mono">
-                {priceFormatted} / mês
-              </div>
-            </div>
-
-            <div className="text-center space-y-1">
-              <h3 className="text-lg font-bold text-white">Stripe Checkout</h3>
-              <p className="text-xs text-slate-400">
-                Cobrança segura com renovação automática mensal
-              </p>
-            </div>
-
-            <div className="space-y-3 text-xs bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
-              <div className="space-y-1">
-                <label className="text-[11px] font-medium text-slate-400">Número do Cartão</label>
-                <input
-                  type="text"
-                  placeholder="0000 0000 0000 0000"
-                  value={cardNumber}
-                  onChange={(e) => setCardNumber(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[11px] font-medium text-slate-400">Nome no Cartão</label>
-                <input
-                  type="text"
-                  placeholder="Nome impresso"
-                  value={cardHolder}
-                  onChange={(e) => setCardHolder(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-slate-400">Validade</label>
-                  <input
-                    type="text"
-                    placeholder="MM/AA"
-                    value={cardExp}
-                    onChange={(e) => setCardExp(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-slate-400">CVV</label>
-                  <input
-                    type="password"
-                    placeholder="123"
-                    maxLength={4}
-                    value={cardCvv}
-                    onChange={(e) => setCardCvv(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleConfirmPix}
-              disabled={isVerifying}
-              className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
-            >
-              <Lock className="w-4 h-4" />
-              <span>Assinar via Stripe ({priceFormatted}/mês)</span>
-            </button>
-          </div>
-        )}
-
-        {/* ======================================================== */}
-        {/* ETAPA 4: SUCESSO                                         */}
+        {/* ETAPA 3: TELA DE SUCESSO                                 */}
         {/* ======================================================== */}
         {currentStep === 'success' && (
-          <div className="py-6 text-center space-y-5 animate-scaleUp">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto shadow-xl shadow-emerald-500/10">
-              <CheckCircle2 className="w-9 h-9" />
+          <div className="text-center py-6 space-y-5 animate-scaleUp">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center mx-auto text-emerald-400 shadow-xl shadow-emerald-500/30">
+              <CheckCircle2 className="w-10 h-10" />
             </div>
 
-            <div className="space-y-1">
-              <h2 className="text-xl font-bold text-white">Instância Renovada com Sucesso!</h2>
-              <p className="text-xs text-slate-300 max-w-sm mx-auto">
-                Mais <strong>30 dias</strong> foram adicionados à sua instância <strong className="text-emerald-400">{instanceCode}</strong>.
+            <div className="space-y-2">
+              <h3 className="text-2xl font-black text-white">Pagamento Confirmado!</h3>
+              <p className="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed">
+                A assinatura da instância <strong className="text-emerald-400 font-mono">{instanceCode}</strong> foi renovada com sucesso por mais <strong>30 dias</strong>.
               </p>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 max-w-sm mx-auto text-left space-y-2 text-xs">
-              <div className="flex justify-between text-slate-400">
-                <span>Instância:</span>
-                <span className="font-semibold text-slate-200">{instanceCode}</span>
+            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 text-left space-y-2 max-w-xs mx-auto">
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">Plano Ativado:</span>
+                <span className="font-bold text-white">{currentPlan.name}</span>
               </div>
-              <div className="flex justify-between text-slate-400">
-                <span>Valor:</span>
-                <span className="font-bold text-emerald-400 font-mono">R$ 19,90</span>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">Valor Pago:</span>
+                <span className="font-bold text-emerald-400">{priceFormatted}</span>
               </div>
-              <div className="flex justify-between text-slate-400">
-                <span>Prazo Total:</span>
-                <span className="font-bold text-white">40 dias restantes</span>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">Dias Totais:</span>
+                <span className="font-bold text-blue-400">{totalDays} dias de uso</span>
               </div>
             </div>
 
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
+              className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-colors"
             >
-              Concluir
+              Fechar e Continuar
             </button>
           </div>
         )}
@@ -560,5 +569,3 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     </div>
   );
 };
-
-export default CheckoutModal;

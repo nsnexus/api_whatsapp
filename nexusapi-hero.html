@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NexusAPI — Hero Interativa</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#05090c; --bg2:#0a1116; --card:#0c151b; --line:#16252e;
+    --green:#10e5a0; --green2:#0fbf86; --cyan:#22d3ee;
+    --txt:#e8f1f4; --muted:#8aa0ab;
+    --mx:50%; --my:50%;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--txt);font-family:Inter,system-ui,sans-serif;overflow-x:hidden}
+
+  /* ===== HERO ===== */
+  .hero{position:relative;min-height:100vh;display:flex;align-items:center;overflow:hidden;isolation:isolate}
+  #net{position:absolute;inset:0;z-index:-3}
+  /* Spotlight que segue o mouse */
+  .spot{position:absolute;inset:0;z-index:-2;pointer-events:none;
+    background:radial-gradient(600px circle at var(--mx) var(--my),rgba(16,229,160,.13),rgba(34,211,238,.05) 35%,transparent 65%)}
+  /* Grade revelada pelo mouse */
+  .grid{position:absolute;inset:0;z-index:-1;pointer-events:none;
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:48px 48px;
+    -webkit-mask-image:radial-gradient(380px circle at var(--mx) var(--my),#000 0%,transparent 70%);
+            mask-image:radial-gradient(380px circle at var(--mx) var(--my),#000 0%,transparent 70%);opacity:.7}
+
+  .wrap{width:min(1240px,92%);margin:auto;display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center;padding:120px 0 80px}
+
+  .badge{display:inline-flex;gap:8px;align-items:center;padding:7px 14px;border-radius:999px;font-size:13px;font-weight:600;
+    color:var(--green);background:rgba(16,229,160,.08);border:1px solid rgba(16,229,160,.25)}
+  .badge .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green);animation:pulse 1.6s infinite}
+  @keyframes pulse{50%{opacity:.35}}
+
+  h1{font-size:clamp(38px,5.2vw,68px);line-height:1.03;font-weight:900;letter-spacing:-.03em;margin:22px 0 18px}
+  h1 .grad{background:linear-gradient(90deg,var(--green),var(--cyan),var(--green));background-size:200% auto;
+    -webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 5s linear infinite}
+  @keyframes shine{to{background-position:200% center}}
+  .typed{border-right:3px solid var(--green);padding-right:4px;animation:caret .8s step-end infinite}
+  @keyframes caret{50%{border-color:transparent}}
+
+  .sub{font-size:18px;line-height:1.6;color:var(--muted);max-width:560px}
+  .sub b{color:var(--txt)}
+
+  .ctas{display:flex;gap:14px;margin:34px 0 26px;flex-wrap:wrap}
+  .btn{position:relative;display:inline-flex;align-items:center;gap:10px;padding:16px 26px;border-radius:14px;font-weight:700;font-size:15px;
+    text-decoration:none;transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s;will-change:transform;overflow:hidden}
+  .btn-primary{color:#03140e;background:linear-gradient(135deg,var(--green),var(--cyan));box-shadow:0 10px 40px -10px rgba(16,229,160,.7)}
+  .btn-primary:hover{box-shadow:0 16px 60px -8px rgba(16,229,160,.9)}
+  /* brilho interno seguindo o mouse no botão */
+  .btn-primary::before{content:"";position:absolute;inset:0;background:radial-gradient(120px circle at var(--bx,50%) var(--by,50%),rgba(255,255,255,.55),transparent 60%);opacity:0;transition:opacity .2s}
+  .btn-primary:hover::before{opacity:1}
+  .btn-ghost{color:var(--txt);background:rgba(255,255,255,.03);border:1px solid #1f2f38}
+  .btn-ghost:hover{border-color:var(--green)}
+  .btn span{position:relative}
+
+  .checks{display:flex;gap:22px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .checks i{color:var(--green);font-style:normal;margin-right:6px}
+
+  /* ===== CARD 3D ===== */
+  .stage{position:relative;perspective:1200px}
+  .card{position:relative;background:linear-gradient(180deg,#0d171d,#081015);border:1px solid #1a2a33;border-radius:20px;
+    box-shadow:0 40px 100px -30px rgba(0,0,0,.9),0 0 0 1px rgba(16,229,160,.05);
+    transform-style:preserve-3d;transition:transform .15s ease-out;will-change:transform}
+  .card::after{content:"";position:absolute;inset:0;border-radius:20px;pointer-events:none;
+    background:radial-gradient(400px circle at var(--cx,50%) var(--cy,50%),rgba(16,229,160,.12),transparent 60%)}
+  .bar{display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid #15232b}
+  .bar span{width:11px;height:11px;border-radius:50%}
+  .bar .url{margin-left:12px;font:12px "JetBrains Mono",monospace;color:var(--muted)}
+  .tabs{margin-left:auto;display:flex;gap:4px}
+  .tabs button{font:600 11px "JetBrains Mono";background:none;border:0;color:var(--muted);padding:5px 9px;border-radius:6px;cursor:pointer}
+  .tabs button.on{background:var(--green);color:#03140e}
+  pre{font:13px/1.75 "JetBrains Mono",monospace;padding:22px 22px 10px;color:#b9c9d1;white-space:pre-wrap;min-height:230px}
+  .k{color:var(--cyan)}.s{color:var(--green)}.n{color:#f5c26b}.c{color:#4f6672}
+  .resp{margin:0 22px 22px;padding:14px 16px;border-radius:12px;background:rgba(16,229,160,.06);border:1px dashed rgba(16,229,160,.3);
+    font:12px "JetBrains Mono";color:var(--green);display:flex;justify-content:space-between;opacity:0;transform:translateY(8px);transition:.4s}
+  .resp.show{opacity:1;transform:none}
+
+  /* chips flutuantes com parallax */
+  .chip{position:absolute;z-index:3;display:flex;align-items:center;gap:10px;padding:11px 15px;border-radius:14px;font-size:13px;font-weight:600;
+    background:rgba(10,20,26,.85);backdrop-filter:blur(10px);border:1px solid #1f3039;box-shadow:0 20px 40px -15px #000;
+    transition:transform .2s ease-out;will-change:transform}
+  .chip small{display:block;font-weight:500;color:var(--muted);font-size:11px}
+  .chip .ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:rgba(16,229,160,.12);color:var(--green)}
+  .c1{top:-28px;right:-18px}.c2{bottom:70px;left:-46px}.c3{bottom:-26px;right:30px}
+
+  /* cursor custom (apenas desktop) */
+  .cursor{position:fixed;top:0;left:0;width:34px;height:34px;border:1.5px solid var(--green);border-radius:50%;pointer-events:none;z-index:99;
+    transform:translate(-50%,-50%);transition:width .2s,height .2s,background .2s;mix-blend-mode:screen}
+  .cursor.hover{width:60px;height:60px;background:rgba(16,229,160,.12)}
+
+  @media (max-width:960px){
+    .wrap{grid-template-columns:1fr;padding-top:100px}
+    .c2{left:-8px}.c1{right:0}
+  }
+  @media (hover:none){.cursor{display:none}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<section class="hero" id="hero">
+  <canvas id="net"></canvas>
+  <div class="spot"></div>
+  <div class="grid"></div>
+
+  <div class="wrap">
+    <!-- TEXTO -->
+    <div>
+      <div class="badge"><span class="dot"></span>API REST v2.0 • Clusters dedicados online</div>
+      <h1>A API de WhatsApp <span class="grad">mais <span class="typed" id="typed">rápida</span></span><br>para suas automações.</h1>
+      <p class="sub">Conecte qualquer sistema, CRM, <b>n8n</b> ou <b>Typebot</b> ao WhatsApp em minutos. Envie textos, áudios PTT, mídias e receba webhooks em tempo real.</p>
+
+      <div class="ctas">
+        <a href="#" class="btn btn-primary magnetic"><span>Testar grátis por 3 dias →</span></a>
+        <a href="#" class="btn btn-ghost magnetic"><span>&gt;_ Ver documentação</span></a>
+      </div>
+
+      <div class="checks">
+        <span><i>✓</i>QR Code em 10s</span>
+        <span><i>✓</i>Webhooks &lt; 150ms</span>
+        <span><i>✓</i>Compatível com n8n & Make</span>
+        <span><i>✓</i>Mensagens ilimitadas</span>
+      </div>
+    </div>
+
+    <!-- CARD 3D -->
+    <div class="stage" id="stage">
+      <div class="card" id="card">
+        <div class="bar">
+          <span style="background:#ff5f57"></span><span style="background:#febc2e"></span><span style="background:#28c840"></span>
+          <div class="url">api.nexusapi.com/v2/message</div>
+          <div class="tabs">
+            <button class="on" data-l="curl">CURL</button>
+            <button data-l="node">NODE</button>
+            <button data-l="py">PYTHON</button>
+          </div>
+        </div>
+        <pre id="code"></pre>
+        <div class="resp" id="resp"><span>✓ 200 OK — message.sent</span><span>142ms</span></div>
+      </div>
+
+      <div class="chip c1" data-depth="30"><div class="ic">⚡</div><div>Webhook recebido<small>há 0.14s</small></div></div>
+      <div class="chip c2" data-depth="45"><div class="ic">✓✓</div><div>Mensagem entregue<small>+55 94 9••••-1234</small></div></div>
+      <div class="chip c3" data-depth="20"><div class="ic">∞</div><div>n8n conectado<small>workflow ativo</small></div></div>
+    </div>
+  </div>
+</section>
+
+<div class="cursor" id="cursor"></div>
+
+<script>
+(() => {
+  const hero = document.getElementById('hero');
+  const root = document.documentElement;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const mouse = { x: -9999, y: -9999, active: false };
+
+  /* ---------- 1. Spotlight + grade seguindo o mouse ---------- */
+  hero.addEventListener('pointermove', e => {
+    const r = hero.getBoundingClientRect();
+    mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top; mouse.active = true;
+    root.style.setProperty('--mx', mouse.x + 'px');
+    root.style.setProperty('--my', mouse.y + 'px');
+  });
+  hero.addEventListener('pointerleave', () => { mouse.active = false; mouse.x = mouse.y = -9999; });
+
+  /* ---------- 2. Rede de partículas (conexões tipo API) ---------- */
+  const cv = document.getElementById('net'), ctx = cv.getContext('2d');
+  let W, H, nodes = [], pulses = [];
+  const DPR = Math.min(devicePixelRatio || 1, 2);
+
+  function resize() {
+    W = hero.clientWidth; H = hero.clientHeight;
+    cv.width = W * DPR; cv.height = H * DPR; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const qtd = Math.min(110, Math.floor(W * H / 14000));
+    nodes = Array.from({ length: qtd }, () => ({
+      x: Math.random() * W, y: Math.random() * H,
+      vx: (Math.random() - .5) * .35, vy: (Math.random() - .5) * .35, r: Math.random() * 1.6 + .6
+    }));
+  }
+
+  // clique = "disparo" de pacote
+  hero.addEventListener('click', e => {
+    const r = hero.getBoundingClientRect();
+    pulses.push({ x: e.clientX - r.left, y: e.clientY - r.top, r: 0, a: 1 });
+  });
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    for (const n of nodes) {
+      n.x += n.vx; n.y += n.vy;
+      if (n.x < 0 || n.x > W) n.vx *= -1;
+      if (n.y < 0 || n.y > H) n.vy *= -1;
+
+      // atração suave para o mouse
+      const dx = mouse.x - n.x, dy = mouse.y - n.y, d = Math.hypot(dx, dy);
+      if (d < 200) { n.x += dx * .006; n.y += dy * .006; }
+
+      // empurrão do pulso do clique
+      for (const p of pulses) {
+        const pd = Math.hypot(n.x - p.x, n.y - p.y);
+        if (Math.abs(pd - p.r) < 12) { n.x += (n.x - p.x) / pd * 2.5; n.y += (n.y - p.y) / pd * 2.5; }
+      }
+    }
+    // linhas entre nós
+    for (let i = 0; i < nodes.length; i++) {
+      const a = nodes[i];
+      for (let j = i + 1; j < nodes.length; j++) {
+        const b = nodes[j], d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (d < 120) {
+          ctx.strokeStyle = `rgba(34,211,238,${(1 - d / 120) * .14})`;
+          ctx.lineWidth = .6; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        }
+      }
+      // conexão com o mouse
+      const dm = Math.hypot(a.x - mouse.x, a.y - mouse.y);
+      if (dm < 190) {
+        ctx.strokeStyle = `rgba(16,229,160,${(1 - dm / 190) * .55})`;
+        ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(mouse.x, mouse.y); ctx.stroke();
+      }
+      ctx.fillStyle = dm < 190 ? '#10e5a0' : 'rgba(138,160,171,.55)';
+      ctx.beginPath(); ctx.arc(a.x, a.y, dm < 190 ? a.r + 1 : a.r, 0, Math.PI * 2); ctx.fill();
+    }
+    // pulsos
+    pulses = pulses.filter(p => p.a > 0);
+    for (const p of pulses) {
+      p.r += 6; p.a -= .018;
+      ctx.strokeStyle = `rgba(16,229,160,${p.a})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (!reduce) requestAnimationFrame(draw);
+  }
+  addEventListener('resize', resize); resize(); draw();
+
+  /* ---------- 3. Card com tilt 3D + parallax nos chips ---------- */
+  const stage = document.getElementById('stage'), card = document.getElementById('card');
+  const chips = [...document.querySelectorAll('.chip')];
+  hero.addEventListener('pointermove', e => {
+    const r = stage.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width - .5, py = (e.clientY - r.top) / r.height - .5;
+    card.style.transform = `rotateY(${px * 14}deg) rotateX(${-py * 14}deg)`;
+    card.style.setProperty('--cx', (px + .5) * 100 + '%');
+    card.style.setProperty('--cy', (py + .5) * 100 + '%');
+    chips.forEach(c => {
+      const d = +c.dataset.depth;
+      c.style.transform = `translate(${-px * d}px, ${-py * d}px)`;
+    });
+  });
+  hero.addEventListener('pointerleave', () => {
+    card.style.transform = ''; chips.forEach(c => c.style.transform = '');
+  });
+
+  /* ---------- 4. Botões magnéticos ---------- */
+  document.querySelectorAll('.magnetic').forEach(btn => {
+    btn.addEventListener('pointermove', e => {
+      const r = btn.getBoundingClientRect();
+      const x = e.clientX - r.left, y = e.clientY - r.top;
+      btn.style.transform = `translate(${(x - r.width / 2) * .25}px, ${(y - r.height / 2) * .35}px)`;
+      btn.style.setProperty('--bx', x + 'px'); btn.style.setProperty('--by', y + 'px');
+    });
+    btn.addEventListener('pointerleave', () => btn.style.transform = '');
+  });
+
+  /* ---------- 5. Cursor personalizado ---------- */
+  const cur = document.getElementById('cursor');
+  let cx = 0, cy = 0, tx = 0, ty = 0;
+  addEventListener('pointermove', e => { tx = e.clientX; ty = e.clientY; });
+  (function loop() { cx += (tx - cx) * .2; cy += (ty - cy) * .2;
+    cur.style.left = cx + 'px'; cur.style.top = cy + 'px'; requestAnimationFrame(loop); })();
+  document.querySelectorAll('a,button').forEach(el => {
+    el.addEventListener('pointerenter', () => cur.classList.add('hover'));
+    el.addEventListener('pointerleave', () => cur.classList.remove('hover'));
+  });
+
+  /* ---------- 6. Palavra digitando no título ---------- */
+  const words = ['rápida', 'estável', 'simples'], el = document.getElementById('typed');
+  let wi = 0, ci = words[0].length, del = true;
+  setInterval(() => {
+    const w = words[wi];
+    if (del) { ci--; if (ci === 0) { del = false; wi = (wi + 1) % words.length; } }
+    else { ci++; if (ci === words[wi].length) setTimeout(() => del = true, 1400); }
+    el.textContent = words[wi].slice(0, ci) || '\u200b';
+  }, 110);
+
+  /* ---------- 7. Código digitado + abas ---------- */
+  const snippets = {
+    curl: `<span class="c"># Envie uma mensagem em 1 requisição</span>
+<span class="k">curl</span> -X POST https://api.nexusapi.com/v2/message \\
+  -H <span class="s">"Authorization: Bearer SEU_TOKEN"</span> \\
+  -d <span class="s">'{
+    "to": "5594999991234",
+    "type": "text",
+    "body": "Olá! Seu pedido saiu 🚀"
+  }'</span>`,
+    node: `<span class="k">const</span> res = <span class="k">await</span> fetch(<span class="s">"https://api.nexusapi.com/v2/message"</span>, {
+  method: <span class="s">"POST"</span>,
+  headers: { Authorization: <span class="s">"Bearer SEU_TOKEN"</span> },
+  body: JSON.stringify({
+    to: <span class="s">"5594999991234"</span>,
+    type: <span class="s">"audio_ptt"</span>,
+    url: <span class="s">"https://cdn.../voz.ogg"</span>
+  })
+});`,
+    py: `<span class="k">import</span> requests
+
+requests.post(
+  <span class="s">"https://api.nexusapi.com/v2/message"</span>,
+  headers={<span class="s">"Authorization"</span>: <span class="s">"Bearer SEU_TOKEN"</span>},
+  json={<span class="s">"to"</span>: <span class="s">"5594999991234"</span>,
+        <span class="s">"type"</span>: <span class="s">"document"</span>,
+        <span class="s">"timeout"</span>: <span class="n">30</span>}
+)`
+  };
+  const code = document.getElementById('code'), resp = document.getElementById('resp');
+  let timer;
+  function typeCode(lang) {
+    clearInterval(timer); resp.classList.remove('show');
+    const html = snippets[lang]; let i = 0;
+    timer = setInterval(() => {
+      // pula tags HTML inteiras para não quebrar o destaque
+      if (html[i] === '<') i = html.indexOf('>', i) + 1; else i++;
+      code.innerHTML = html.slice(0, i);
+      if (i >= html.length) { clearInterval(timer); setTimeout(() => resp.classList.add('show'), 250); }
+    }, 14);
+  }
+  document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+    document.querySelector('.tabs .on').classList.remove('on'); b.classList.add('on'); typeCode(b.dataset.l);
+  });
+  typeCode('curl');
+})();
+</script>
+</body>
+</html>
