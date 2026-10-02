@@ -897,7 +897,7 @@ requests.post("${baseUrl}/message/sendWhatsAppAudio/${activeInstance}",
       requestBody: {
         complete: JSON.stringify({
           enabled: true,
-          url: "https://crm-evolution-worker.narcisofelizardoconta1.workers.dev/api/webhook",
+          url: "https://nexusapi.nsnexus.com.br/webhook",
           webhookByEvents: false,
           events: [
             "MESSAGES_UPSERT",

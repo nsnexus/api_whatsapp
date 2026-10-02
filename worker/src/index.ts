@@ -40,6 +40,16 @@ export default {
     }
 
     try {
+      // 1.5 Rota de status / health check
+      if ((url.pathname === '/' || url.pathname === '/health') && method === 'GET') {
+        return jsonResponse({
+          status: 'online',
+          service: 'CRM WhatsApp Evolution API Gateway',
+          subdomain: 'nexusapi.nsnexus.com.br',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
       // 2. Rota: Webhook recebido da Evolution Go (VPS)
       if (url.pathname === '/webhook' && method === 'POST') {
         const payload = await request.json();

@@ -2,6 +2,11 @@ name = "crm-evolution-worker"
 main = "src/index.ts"
 compatibility_date = "2024-09-01"
 
+# Subdomínio personalizado do Worker para API e Webhooks
+routes = [
+  { pattern = "nexusapi.nsnexus.com.br", custom_domain = true }
+]
+
 # Bucket R2 para armazenar áudios, imagens e anexos do WhatsApp com tráfego gratuito
 [[r2_buckets]]
 binding = "CRM_MEDIA_BUCKET"
