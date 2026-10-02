@@ -162,9 +162,69 @@ export default {
         return jsonResponse({ instances: instances || [] });
       }
 
-      // 4. Rota: Criar Nova Instância do WhatsApp
+      // 4. Rota: Criar Nova Instância do WhatsApp com Trava Anti-Abuso de Trial
       if (url.pathname === '/api/instances/create' && method === 'POST') {
         const body = (await request.json()) as { organizationId: string; name: string };
+        if (!body.organizationId || !body.name) {
+          return jsonResponse({ error: 'organizationId e name são obrigatórios.' }, 400);
+        }
+
+        // 4.0 Checagem de Plano e Limites de Instância
+        const { data: org } = await supabase
+          .from('organizations')
+          .select('plan, max_instances')
+          .eq('id', body.organizationId)
+          .single();
+
+        const isPaid = org && (org.plan === 'pro' || org.plan === 'enterprise' || (org.max_instances && org.max_instances > 1));
+
+        // Se for conta Trial (não paga):
+        if (!isPaid) {
+          // A) Limite de 1 instância por organização
+          const { data: existingInstances } = await supabase
+            .from('instances')
+            .select('id')
+            .eq('organization_id', body.organizationId);
+
+          if (existingInstances && existingInstances.length >= 1) {
+            return jsonResponse({
+              error: 'trial_limit_reached',
+              requiresPayment: true,
+              message: 'O plano de teste gratuito permite apenas 1 instância ativa. Para adicionar mais conexões, assine um plano.'
+            }, 403);
+          }
+
+          // B) Anti-Abuso por IP (Cloudflare Header cf-connecting-ip)
+          const clientIp = request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || '';
+          if (clientIp && env.CRM_MEDIA_BUCKET) {
+            const safeIp = clientIp.replace(/[:.\s]/g, '_');
+            const ipKey = `trials/ip/${safeIp}.json`;
+            const existingTrial = await env.CRM_MEDIA_BUCKET.get(ipKey);
+            if (existingTrial) {
+              try {
+                const info = JSON.parse(await existingTrial.text());
+                if (info.organization_id !== body.organizationId) {
+                  return jsonResponse({
+                    error: 'trial_ip_used',
+                    requiresPayment: true,
+                    message: 'Este dispositivo ou conexão IP já utilizou o período de teste gratuito de 3 dias. Para continuar, assine um plano.'
+                  }, 403);
+                }
+              } catch (e) {}
+            } else {
+              // Registra o IP no bucket R2 para auditoria
+              await env.CRM_MEDIA_BUCKET.put(
+                ipKey,
+                JSON.stringify({
+                  ip: clientIp,
+                  organization_id: body.organizationId,
+                  created_at: new Date().toISOString()
+                })
+              );
+            }
+          }
+        }
+
         const safeInstanceName = `org_${body.organizationId.substring(0, 8)}_${Date.now()}`;
 
         // 4.1 Registra na Evolution Go
@@ -345,6 +405,33 @@ export default {
       // 6. Rota: Envio de Mensagem de Texto
       if (url.pathname === '/api/messages/send-text' && method === 'POST') {
         const body = (await request.json()) as SendTextMessageRequest;
+
+        // Checa expiração do trial de 3 dias
+        const { data: instCheck } = await supabase
+          .from('instances')
+          .select('created_at, organization_id')
+          .eq('instance_name', body.instanceName)
+          .single();
+
+        if (instCheck) {
+          const { data: instOrg } = await supabase
+            .from('organizations')
+            .select('plan, max_instances')
+            .eq('id', instCheck.organization_id)
+            .single();
+
+          const isPaid = instOrg && (instOrg.plan === 'pro' || instOrg.plan === 'enterprise' || (instOrg.max_instances && instOrg.max_instances > 1));
+          if (!isPaid) {
+            const ageHours = (Date.now() - new Date(instCheck.created_at).getTime()) / (1000 * 60 * 60);
+            if (ageHours > 72) {
+              return jsonResponse({
+                error: 'trial_expired',
+                requiresPayment: true,
+                message: 'O período de teste gratuito de 3 dias expirou. Assine um plano para continuar enviando mensagens.'
+              }, 403);
+            }
+          }
+        }
 
         // 6.1 Envia através da Evolution Go na VPS
         const sendResult = await evolution.sendText(body.instanceName, {

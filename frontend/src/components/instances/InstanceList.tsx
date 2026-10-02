@@ -259,7 +259,14 @@ export const InstanceList: React.FC<InstanceListProps> = ({
         </div>
 
         <button
-          onClick={() => setShowCreateModal(true)}
+          onClick={() => {
+            if (instancesState.length >= 1) {
+              setSelectedInstanceForCheckout(instancesState[0] || null);
+              setIsCheckoutOpen(true);
+              return;
+            }
+            setShowCreateModal(true);
+          }}
           className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#10b981] hover:bg-[#059669] text-slate-950 font-bold text-xs shadow-lg transition-all active:scale-95"
         >
           <Plus className="w-4 h-4" />
@@ -350,26 +357,58 @@ export const InstanceList: React.FC<InstanceListProps> = ({
                       </button>
                     </div>
 
-                    {/* Box de Expiração / Plano Ativo */}
-                    <div className="bg-[#10b981]/5 border border-[#10b981]/30 rounded-xl p-3 flex items-center justify-between">
-                      <div>
-                        <div className="text-xs font-bold text-white">Expira em 30 dias</div>
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-[#10b981] flex items-center gap-1.5 mt-0.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] animate-pulse"></span>
-                          PLANO ATIVO
-                        </div>
-                      </div>
+                    {/* Box de Expiração / Plano / Trial */}
+                    {(() => {
+                      const hoursOld = (Date.now() - new Date(instance.created_at).getTime()) / (1000 * 60 * 60);
+                      const isTrialExpired = hoursOld >= 72;
+                      const daysLeft = Math.max(0, Math.ceil((72 - hoursOld) / 24));
 
-                      <button
-                        onClick={() => {
-                          setSelectedInstanceForCheckout(instance);
-                          setIsCheckoutOpen(true);
-                        }}
-                        className="px-3.5 py-1.5 rounded-full bg-[#10b981] hover:bg-[#059669] text-slate-950 font-bold text-xs shadow transition-all active:scale-95"
-                      >
-                        Renovar
-                      </button>
-                    </div>
+                      if (isTrialExpired) {
+                        return (
+                          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-red-400">Período de Teste Expirado</div>
+                              <div className="text-[10px] font-bold uppercase tracking-wider text-red-500 flex items-center gap-1.5 mt-0.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                                ASSINATURA NECESSÁRIA
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setSelectedInstanceForCheckout(instance);
+                                setIsCheckoutOpen(true);
+                              }}
+                              className="px-3.5 py-1.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow transition-all active:scale-95"
+                            >
+                              Ativar (R$ 19,90)
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="bg-[#10b981]/5 border border-[#10b981]/30 rounded-xl p-3 flex items-center justify-between">
+                          <div>
+                            <div className="text-xs font-bold text-white">
+                              Teste Grátis: {daysLeft} {daysLeft === 1 ? 'dia restante' : 'dias restantes'}
+                            </div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-[#10b981] flex items-center gap-1.5 mt-0.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] animate-pulse"></span>
+                              PERÍODO DE TESTE (3 DIAS)
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSelectedInstanceForCheckout(instance);
+                              setIsCheckoutOpen(true);
+                            }}
+                            className="px-3.5 py-1.5 rounded-full bg-[#10b981] hover:bg-[#059669] text-slate-950 font-bold text-xs shadow transition-all active:scale-95"
+                          >
+                            Assinar Plano
+                          </button>
+                        </div>
+                      );
+                    })()}
 
                     {/* ID da Instância */}
                     <div className="space-y-1">
@@ -675,9 +714,10 @@ export const InstanceList: React.FC<InstanceListProps> = ({
               <button
                 type="submit"
                 disabled={isCreating}
-                className="px-5 py-2.5 rounded-xl bg-[#10b981] hover:bg-[#059669] text-slate-950 font-bold text-xs shadow-md disabled:opacity-50"
+                className="px-5 py-2.5 rounded-xl bg-[#10b981] hover:bg-[#059669] text-slate-950 font-bold text-xs shadow-md disabled:opacity-50 flex items-center gap-2"
               >
-                {isCreating ? 'Criando na VPS...' : 'Criar Instância'}
+                {isCreating && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                <span>{isCreating ? 'Criando Instância...' : 'Criar Instância'}</span>
               </button>
             </div>
           </form>

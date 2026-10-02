@@ -105,11 +105,62 @@ export async function handleEvolutionWebhook(payload: EvolutionWebhookPayload, e
     if (state === 'open' || state === 'connected') mappedStatus = 'connected';
     else if (state === 'connecting') mappedStatus = 'connecting';
 
+    const rawOwner = data?.ownerJid || data?.user?.id || data?.instance?.owner;
+    const phone = rawOwner ? String(rawOwner).replace(/\D/g, '') : undefined;
+
+    // Se conectou, valida a trava anti-abuso de trial por número de WhatsApp
+    if (mappedStatus === 'connected' && phone && env.CRM_MEDIA_BUCKET) {
+      const { data: org } = await supabase
+        .from('organizations')
+        .select('plan, max_instances')
+        .eq('id', organizationId)
+        .single();
+
+      const isPaid = org && (org.plan === 'pro' || org.plan === 'enterprise' || (org.max_instances && org.max_instances > 1));
+
+      if (!isPaid) {
+        const phoneKey = `trials/phone/${phone}.json`;
+        const existingPhone = await env.CRM_MEDIA_BUCKET.get(phoneKey);
+        if (existingPhone) {
+          try {
+            const info = JSON.parse(await existingPhone.text());
+            if (info.organization_id !== organizationId || info.instance_id !== instanceId) {
+              console.warn(`[AntiAbuso] Telefone ${phone} já utilizou o trial na organização ${info.organization_id}. Desconectando.`);
+              const evolution = new EvolutionGoClient(env);
+              await evolution.logoutInstance(instanceName).catch(() => {});
+
+              await supabase
+                .from('instances')
+                .update({
+                  status: 'disconnected',
+                  phone_number: phone,
+                  qr_code: null,
+                })
+                .eq('id', instanceId);
+
+              return new Response(JSON.stringify({ status: 'blocked', reason: 'phone_already_used_trial' }), { status: 200 });
+            }
+          } catch (e) {}
+        } else {
+          // Registra este número de WhatsApp como usuário de trial
+          await env.CRM_MEDIA_BUCKET.put(
+            phoneKey,
+            JSON.stringify({
+              phone,
+              organization_id: organizationId,
+              instance_id: instanceId,
+              activated_at: new Date().toISOString()
+            })
+          );
+        }
+      }
+    }
+
     await supabase
       .from('instances')
       .update({
         status: mappedStatus,
-        phone_number: data?.ownerJid ? data.ownerJid.replace(/\D/g, '') : undefined,
+        phone_number: phone || undefined,
         profile_picture_url: data?.profilePicUrl || undefined,
         qr_code: mappedStatus === 'connected' ? null : undefined,
       })

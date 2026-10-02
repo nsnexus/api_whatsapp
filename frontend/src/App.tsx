@@ -309,7 +309,12 @@ export const App: React.FC = () => {
       });
 
       if (res.error) {
-        alert('Erro ao criar instância: ' + res.error);
+        if (res.requiresPayment) {
+          alert(res.message || 'Limite de teste atingido. Assine um plano para continuar.');
+          setCurrentTab('invoices');
+          return;
+        }
+        alert('Erro ao criar instância: ' + (res.message || res.error));
         return;
       }
 
