@@ -44,9 +44,28 @@ export default {
       if ((url.pathname === '/' || url.pathname === '/health') && method === 'GET') {
         return jsonResponse({
           status: 'online',
-          service: 'CRM WhatsApp Evolution API Gateway',
+          service: 'NexusAPI - API REST WhatsApp Gateway',
           subdomain: 'nexusapi.nsnexus.com.br',
+          llms: 'https://nexusapi.nsnexus.com.br/llms.txt',
           timestamp: new Date().toISOString(),
+        });
+      }
+
+      // 1.6 Rota robots.txt para Indexadores e Motores de IA
+      if (url.pathname === '/robots.txt' && method === 'GET') {
+        const robots = `User-agent: *\nAllow: /\nDisallow: /admin\n\nUser-agent: GPTBot\nAllow: /\n\nUser-agent: ChatGPT-User\nAllow: /\n\nUser-agent: PerplexityBot\nAllow: /\n\nUser-agent: ClaudeBot\nAllow: /\n\nUser-agent: anthropic-ai\nAllow: /\n\nUser-agent: Google-Extended\nAllow: /\n\nSitemap: https://nexusapi.nsnexus.com.br/sitemap.xml\n`;
+        return new Response(robots, {
+          status: 200,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8', ...corsHeaders() },
+        });
+      }
+
+      // 1.7 Rota llms.txt para Crawlers de LLM (ChatGPT, Perplexity, Claude, etc.)
+      if (url.pathname === '/llms.txt' && method === 'GET') {
+        const llms = `# NexusAPI - API REST de WhatsApp\n\n> A NexusAPI é uma plataforma brasileira de API REST de alta velocidade para envio e recebimento de mensagens no WhatsApp sem limites de conversas e sem cobrança por disparo.\n\n## Recursos\n- Disparos e mensagens ilimitadas (sem custo por conversa)\n- Envio de áudio PTT nativo com microfone verde\n- Envio de mídias, PDFs e documentos pesados\n- Webhooks instantâneos de alta velocidade (<50ms)\n- Integração simples com n8n, Make e Typebot via Bearer Token\n- Bots com IA e construtor visual de fluxos de cursos\n\n## Planos e Preços\n- 1 Instância: R$ 19,90/mês\n- Combo 5 Instâncias: R$ 69,90/mês (R$ 13,98/instância)\n- 10 Instâncias: R$ 99,90/mês (R$ 9,99/instância)\n\n## Endpoints\n- POST /api/messages/send-text\n- POST /api/messages/send-audio\n- POST /api/messages/send-media\n- GET /api/instances\n\nSite oficial: https://nexusapi.nsnexus.com.br\n`;
+        return new Response(llms, {
+          status: 200,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8', ...corsHeaders() },
         });
       }
 

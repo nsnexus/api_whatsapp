@@ -378,7 +378,7 @@ export const AdminDashboardView: React.FC = () => {
               <span className="text-xs font-normal text-slate-400">/mês</span>
             </div>
             <p className="text-xs text-slate-400 flex items-center gap-1.5">
-              <span>Pacotes: R$ 19,90 • R$ 29,90 • R$ 49,90</span>
+              <span>Pacotes: R$ 19,90 • R$ 69,90 • R$ 99,90</span>
             </p>
           </div>
         </div>
@@ -591,8 +591,10 @@ export const AdminDashboardView: React.FC = () => {
                               ? '1 Instância (R$ 19,90)'
                               : client.max_instances === 2
                               ? '2 Instâncias (R$ 29,90)'
-                              : client.max_instances >= 5
-                              ? 'Combo 5 (R$ 49,90)'
+                              : client.max_instances === 5
+                              ? 'Combo 5 (R$ 69,90)'
+                              : client.max_instances >= 10
+                              ? '10 Instâncias (R$ 99,90)'
                               : `${client.max_instances} Instâncias`}
                           </span>
                         </td>
@@ -646,8 +648,8 @@ export const AdminDashboardView: React.FC = () => {
                 >
                   <option value="all">Todos os Planos</option>
                   <option value="1">1 Instância (R$ 19,90)</option>
-                  <option value="2">2 Instâncias (R$ 29,90)</option>
-                  <option value="5">Combo 5 Instâncias (R$ 49,90)</option>
+                  <option value="5">Combo 5 Instâncias (R$ 69,90)</option>
+                  <option value="10">10 Instâncias (R$ 99,90)</option>
                 </select>
               </div>
             </div>
@@ -709,8 +711,10 @@ export const AdminDashboardView: React.FC = () => {
                               ? '1 Instância • R$ 19,90'
                               : client.max_instances === 2
                               ? '2 Instâncias • R$ 29,90'
-                              : client.max_instances >= 5
-                              ? 'Combo 5 • R$ 49,90'
+                              : client.max_instances === 5
+                              ? 'Combo 5 • R$ 69,90'
+                              : client.max_instances >= 10
+                              ? '10 Instâncias • R$ 99,90'
                               : `${client.max_instances} Instâncias`}
                           </span>
                         </td>
@@ -975,7 +979,7 @@ export const AdminDashboardView: React.FC = () => {
               >
                 <div className="flex justify-between items-center font-bold text-xs">
                   <span>Combo 5 Instâncias WhatsApp</span>
-                  <span className="text-emerald-400">R$ 49,90/mês</span>
+                  <span className="text-emerald-400">R$ 69,90/mês</span>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-0.5">Pacote completo para até 5 conexões simultâneas</p>
               </div>
@@ -992,10 +996,10 @@ export const AdminDashboardView: React.FC = () => {
                 }`}
               >
                 <div className="flex justify-between items-center font-bold text-xs">
-                  <span>Plano VIP Ilimitado / Custom</span>
-                  <span className="text-purple-400">Personalizado</span>
+                  <span>Plano 10 Instâncias WhatsApp</span>
+                  <span className="text-emerald-400">R$ 99,90/mês</span>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-0.5">Permite conectar até 10 instâncias</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Permite conectar até 10 instâncias em alta escala</p>
               </div>
             </div>
 

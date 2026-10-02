@@ -53,17 +53,30 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     : 'WHATSAPP-34O7BP-59EWJO';
 
   const [selectedPlanId, setSelectedPlanId] = useState<string>(() => {
+    if (selectedPlan?.includes('10')) return '10_instancias';
     if (selectedPlan?.includes('5') || selectedPlan?.includes('combo')) return 'combo_5';
     if (selectedPlan?.includes('2')) return '2_instancias';
     return '1_instancia';
   });
 
-  const planInfo = {
+  const planInfo: Record<string, { name: string; priceFormatted: string; priceNumber: number; pixCode: string }> = {
     '1_instancia': {
       name: '1 Instância',
       priceFormatted: 'R$ 19,90',
       priceNumber: 19.90,
       pixCode: '00020126480014br.gov.bcb.pix0126narcisofelizardo@gmail.com520400005303986540519.905802BR5914NARCISO SANTOS6009SAO PAULO62070503***630425FA',
+    },
+    'combo_5': {
+      name: 'Combo 5 Instâncias',
+      priceFormatted: 'R$ 69,90',
+      priceNumber: 69.90,
+      pixCode: '00020126480014br.gov.bcb.pix0126narcisofelizardo@gmail.com520400005303986540569.905802BR5914NARCISO SANTOS6009SAO PAULO62070503***6304CA22',
+    },
+    '10_instancias': {
+      name: '10 Instâncias',
+      priceFormatted: 'R$ 99,90',
+      priceNumber: 99.90,
+      pixCode: '00020126480014br.gov.bcb.pix0126narcisofelizardo@gmail.com520400005303986540599.905802BR5914NARCISO SANTOS6009SAO PAULO62070503***63049A56',
     },
     '2_instancias': {
       name: '2 Instâncias',
@@ -71,22 +84,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       priceNumber: 29.90,
       pixCode: '00020126480014br.gov.bcb.pix0126narcisofelizardo@gmail.com520400005303986540529.905802BR5914NARCISO SANTOS6009SAO PAULO62070503***630495F4',
     },
-    'combo_5': {
-      name: 'Combo 5 Instâncias',
-      priceFormatted: 'R$ 49,90',
-      priceNumber: 49.90,
-      pixCode: '00020126480014br.gov.bcb.pix0126narcisofelizardo@gmail.com520400005303986540549.905802BR5914NARCISO SANTOS6009SAO PAULO62070503***6304E5C9',
-    },
-  }[selectedPlanId] || {
-    name: '1 Instância',
-    priceFormatted: 'R$ 19,90',
-    priceNumber: 19.90,
-    pixCode: '00020126480014br.gov.bcb.pix0126narcisofelizardo@gmail.com520400005303986540519.905802BR5914NARCISO SANTOS6009SAO PAULO62070503***630425FA',
   };
 
-  const priceFormatted = planInfo.priceFormatted;
-  const priceNumber = planInfo.priceNumber;
-  const pixCode = planInfo.pixCode;
+  const currentPlan = planInfo[selectedPlanId] || planInfo['1_instancia'];
+  const priceFormatted = currentPlan.priceFormatted;
+  const priceNumber = currentPlan.priceNumber;
+  const pixCode = currentPlan.pixCode;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(pixCode)}&margin=8`;
 
   // Temporizador do PIX (15 min)
@@ -189,19 +192,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
               <button
                 type="button"
-                onClick={() => setSelectedPlanId('2_instancias')}
-                className={`py-2 px-1 rounded-xl text-center transition-all ${
-                  selectedPlanId === '2_instancias'
-                    ? 'bg-emerald-500 text-slate-950 font-bold shadow-md'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <div className="text-[11px]">2 Instâncias</div>
-                <div className="text-xs font-extrabold">R$ 29,90</div>
-              </button>
-
-              <button
-                type="button"
                 onClick={() => setSelectedPlanId('combo_5')}
                 className={`py-2 px-1 rounded-xl text-center transition-all relative ${
                   selectedPlanId === 'combo_5'
@@ -213,7 +203,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   Combo
                 </span>
                 <div className="text-[11px]">5 Instâncias</div>
-                <div className="text-xs font-extrabold">R$ 49,90</div>
+                <div className="text-xs font-extrabold">R$ 69,90</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedPlanId('10_instancias')}
+                className={`py-2 px-1 rounded-xl text-center transition-all ${
+                  selectedPlanId === '10_instancias'
+                    ? 'bg-emerald-500 text-slate-950 font-bold shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <div className="text-[11px]">10 Instâncias</div>
+                <div className="text-xs font-extrabold">R$ 99,90</div>
               </button>
             </div>
 
@@ -508,7 +511,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
             >
               <Lock className="w-4 h-4" />
-              <span>Assinar via Stripe (R$ 19,90/mês)</span>
+              <span>Assinar via Stripe ({priceFormatted}/mês)</span>
             </button>
           </div>
         )}

@@ -1,0 +1,76 @@
+# NexusAPI - API REST de WhatsApp para Desenvolvedores & Automações
+
+> A NexusAPI é uma plataforma brasileira de API REST de alta velocidade para envio e recebimento de mensagens no WhatsApp sem limite de conversas e sem cobrança por disparo. Desenvolvida especialmente para desenvolvedores, agências, empresas SaaS e operações com n8n, Typebot, Make e Webhooks.
+
+## Principais Recursos e Diferenciais
+
+- **Mensagens e Conversas Ilimitadas:** Sem cobrança em dólar por janela de 24 horas como na API Cloud oficial da Meta.
+- **Envio de Áudio PTT com Microfone Verde:** Áudios convertidos no codec nativo Opus/OGG para serem escutados como se tivessem sido gravados e falados na hora.
+- **Disparo de Mídias e Arquivos:** Suporte a fotos, vídeos em alta qualidade, documentos PDF, áudios e arquivos pesados.
+- **Botões Nativos e Chave PIX Copia e Cola:** Suporte a cards nativos do WhatsApp com botão oficial de copiar chave PIX ou link de pagamento.
+- **Fila Anti-Ban Inteligente:** Intervalos humanizados entre disparos e proteção contra bloqueios de número.
+- **Webhooks de Alta Velocidade (<50ms):** Notificações instantâneas de mensagens recebidas, status de leitura e confirmação de entrega.
+- **Integração Pronta com n8n, Make e Typebot:** Compatibilidade REST JSON universal com nós HTTP simples e autenticação Bearer Token.
+- **Bots com Inteligência Artificial para Venda de Cursos:** Construtor de funil visual com etapas automatizadas, envio de materiais e chave PIX para conversão de leads.
+
+## Planos Comerciais e Preços
+
+- **1 Instância (Starter):** R$ 19,90/mês. Ideal para desenvolvedores, automações pontuais e projetos únicos. 1 número conectado, mensagens ilimitadas, API REST completa, áudios PTT, webhooks em tempo real e suporte via WhatsApp.
+- **Combo 5 Instâncias (Pro):** R$ 69,90/mês (Apenas R$ 13,98 por instância/mês). Ideal para agências, múltiplos clientes e operações em escala. 5 números simultâneos, API Keys independentes, cluster prioritário de envio e painel centralizado.
+- **10 Instâncias (Enterprise):** R$ 99,90/mês (Apenas R$ 9,99 por instância/mês). Para grandes plataformas, SaaS e empresas de automação em massa. 10 números de WhatsApp simultâneos, infraestrutura dedicada com auto-scaling, failover automático e suporte 24/7.
+
+## Endpoints Principais da API REST
+
+Base URL da API: `https://nexusapi.nsnexus.com.br`
+
+### 1. Enviar Mensagem de Texto
+- **Método:** `POST`
+- **Rota:** `/api/messages/send-text`
+- **Cabeçalho:** `Authorization: Bearer <SEU_TOKEN>`
+- **Body JSON:**
+```json
+{
+  "number": "5511999998888",
+  "text": "Olá! Sua mensagem foi enviada via NexusAPI."
+}
+```
+
+### 2. Enviar Áudio com Microfone Verde (PTT)
+- **Método:** `POST`
+- **Rota:** `/api/messages/send-audio`
+- **Body JSON:**
+```json
+{
+  "number": "5511999998888",
+  "audioUrl": "https://meusite.com/audio.mp3",
+  "ptt": true
+}
+```
+
+### 3. Enviar Mídia (Imagem, Vídeo, Documento PDF)
+- **Método:** `POST`
+- **Rota:** `/api/messages/send-media`
+- **Body JSON:**
+```json
+{
+  "number": "5511999998888",
+  "mediaUrl": "https://meusite.com/arquivo.pdf",
+  "mediaType": "document",
+  "caption": "Segue o contrato em anexo."
+}
+```
+
+### 4. Gerenciamento de Instâncias e QR Code
+- **Listar Instâncias:** `GET /api/instances`
+- **Criar Instância:** `POST /api/instances`
+- **Obter QR Code para Conexão:** `GET /api/instances/:instanceName/qrcode`
+- **Desconectar Instância:** `POST /api/instances/:instanceName/logout`
+
+## Formas de Pagamento
+Ativação imediata via PIX automático com código Copia & Cola e QR Code dinâmico, além de cartão de crédito. Sem fidelidade, cancele a qualquer momento.
+
+## Contato & Documentação
+- Site Oficial: https://nsnexus.api.br
+- Documentação Técnica: https://nsnexus.api.br/#docs
+- Gateway da API REST: https://nexusapi.nsnexus.com.br
+- Suporte Técnico em Português via WhatsApp.

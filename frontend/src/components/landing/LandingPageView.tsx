@@ -131,8 +131,8 @@ const plans = [
     id: '1_instancia',
     name: '1 Instância (Starter)',
     tagline: 'Ideal para desenvolvedores, automações pontuais e projetos únicos',
-    price: 49.90,
-    priceDisplay: '49,90',
+    price: 19.90,
+    priceDisplay: '19,90',
     popular: false,
     features: [
       '1 número de WhatsApp conectado',
@@ -150,13 +150,13 @@ const plans = [
     id: 'combo_5',
     name: 'Combo 5 Instâncias (Pro)',
     tagline: 'Mais Vendido • Para agências, múltiplos clientes e operações em escala',
-    price: 149.90,
-    priceDisplay: '149,90',
+    price: 69.90,
+    priceDisplay: '69,90',
     popular: true,
     badge: 'MELHOR CUSTO-BENEFÍCIO',
     features: [
       '5 números de WhatsApp simultâneos',
-      'Apenas R$ 29,98 por instância/mês',
+      'Apenas R$ 13,98 por instância/mês',
       'Mensagens ilimitadas em todas as instâncias',
       'API Keys independentes por número',
       'Webhooks dedicados de alta velocidade (<50ms)',
@@ -170,12 +170,12 @@ const plans = [
     id: '10_instancias',
     name: '10 Instâncias (Enterprise)',
     tagline: 'Para grandes plataformas, SaaS e empresas de automação em massa',
-    price: 269.90,
-    priceDisplay: '269,90',
+    price: 99.90,
+    priceDisplay: '99,90',
     popular: false,
     features: [
       '10 números de WhatsApp simultâneos',
-      'Apenas R$ 26,99 por instância/mês',
+      'Apenas R$ 9,99 por instância/mês',
       'Infraestrutura dedicada com auto-scaling',
       'Tráfego ilimitado de mídias e arquivos',
       'Failover automático de reconexão',
@@ -248,7 +248,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
             <div className="relative h-11 flex items-center group-hover:scale-105 transition-transform">
               <img
                 src="/logo.png"
-                alt="NexusAPI Logo"
+                alt="NexusAPI - API REST de WhatsApp para Automações"
+                width="40"
+                height="40"
+                loading="eager"
                 className="h-10 w-auto object-contain drop-shadow-[0_4px_12px_rgba(16,185,129,0.25)]"
               />
             </div>
@@ -320,6 +323,8 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           {/* Botão Mobile */}
           <button
             type="button"
+            aria-label="Alternar menu de navegação"
+            aria-expanded={mobileMenuOpen}
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white"
           >
@@ -385,8 +390,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
         )}
       </header>
 
-      {/* HERO SECTION */}
-      <section className="relative pt-12 pb-20 md:pt-20 md:pb-28 z-10">
+      {/* CONTEÚDO PRINCIPAL (MAIN SEMÂNTICO PARA SEO) */}
+      <main id="main-content">
+        {/* HERO SECTION */}
+        <section aria-labelledby="hero-title" className="relative pt-12 pb-20 md:pt-20 md:pb-28 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           {/* Badge de Lançamento */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold mb-7 shadow-inner">
@@ -395,7 +402,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           </div>
 
           {/* Headline Principal */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-white tracking-tight leading-[1.1] max-w-5xl mx-auto">
+          <h1 id="hero-title" className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-white tracking-tight leading-[1.1] max-w-5xl mx-auto">
             A API de WhatsApp mais <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">rápida, estável e simples</span> para suas automações.
           </h1>
 
@@ -906,12 +913,20 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           </div>
         </div>
       </section>
+      </main>
 
       {/* FOOTER */}
       <footer className="py-12 border-t border-slate-800/80 bg-[#060911] text-xs text-slate-400 relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="NexusAPI" className="h-8 w-auto object-contain" />
+            <img
+              src="/logo.png"
+              alt="NexusAPI - Automações de WhatsApp"
+              width="32"
+              height="32"
+              loading="lazy"
+              className="h-8 w-auto object-contain"
+            />
             <div>
               <p className="font-bold text-white text-sm">NexusAPI</p>
               <p className="text-[11px] text-slate-500">API Profissional de WhatsApp para Automações</p>
