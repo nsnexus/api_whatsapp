@@ -258,10 +258,13 @@ export const App: React.FC = () => {
     };
     window.addEventListener('hashchange', handleHashChange);
 
-    // Volta do login com Google: consome o parâmetro code uma única vez
+    // Volta do login com Google / OAuth
     const urlParams = new URLSearchParams(window.location.search);
-    let isInitialOAuthLogin = urlParams.has('code');
-    if (isInitialOAuthLogin) {
+    const hasOAuthCode = urlParams.has('code');
+    const hasOAuthTokenInHash = window.location.hash.includes('access_token');
+    let isOAuthRedirect = hasOAuthCode || hasOAuthTokenInHash;
+
+    if (hasOAuthCode) {
       urlParams.delete('code');
       const cleanSearch = urlParams.toString() ? `?${urlParams.toString()}` : '';
       window.history.replaceState(null, '', window.location.pathname + cleanSearch + (window.location.hash || '#app'));
@@ -276,11 +279,12 @@ export const App: React.FC = () => {
         setInstances([]);
       }
 
-      // Redireciona apenas uma única vez na conclusão do OAuth, sem interferir em renovações periódicas de token
-      if (isInitialOAuthLogin && session && event === 'SIGNED_IN') {
-        isInitialOAuthLogin = false;
+      // Redireciona para o painel (#app) na conclusão do login via OAuth ou evento de autenticação
+      if (session && (event === 'SIGNED_IN' || (isOAuthRedirect && (event as string) === 'INITIAL_SESSION'))) {
+        isOAuthRedirect = false;
         window.history.replaceState(null, '', window.location.pathname + '#app');
         setCurrentTab('instances');
+        setIsAuthModalOpen(false);
       }
     });
 

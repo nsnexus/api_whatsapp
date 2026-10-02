@@ -49,35 +49,31 @@ export const NexusHero: React.FC<NexusHeroProps> = ({ onOpenAuth, onOpenDocs }) 
   const chipsRef = useRef<(HTMLDivElement | null)[]>([]);
 
   // Estado para efeito de digitação da palavra no título
-  const [typedWord, setTypedWord] = useState('rápida');
+  const [typedWord, setTypedWord] = useState('');
   const [activeTab, setActiveTab] = useState<'curl' | 'node' | 'python'>('curl');
 
-  // 1. Efeito de digitação da palavra dinâmica (rápida, estável, simples)
+  // 1. Digita a palavra fixa uma única vez e para com o cursor piscando
   useEffect(() => {
-    const words = ['rápida', 'estável', 'simples', 'escalável'];
-    let wordIndex = 0;
-    let charIndex = words[0].length;
-    let isDeleting = true;
+    const target = 'estável';
+    let charIndex = 0;
+    let interval: ReturnType<typeof setInterval>;
 
-    const interval = setInterval(() => {
-      const current = words[wordIndex];
-      if (isDeleting) {
-        charIndex--;
-        if (charIndex === 0) {
-          isDeleting = false;
-          wordIndex = (wordIndex + 1) % words.length;
-        }
-      } else {
+    const timeout = setTimeout(() => {
+      interval = setInterval(() => {
         charIndex++;
-        if (charIndex === words[wordIndex].length) {
-          isDeleting = true;
+        setTypedWord(target.slice(0, charIndex));
+        if (charIndex >= target.length) {
+          clearInterval(interval);
         }
-      }
-      setTypedWord(words[wordIndex].slice(0, charIndex) || '\u200b');
-    }, 110);
+      }, 120);
+    }, 200);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timeout);
+      if (interval) clearInterval(interval);
+    };
   }, []);
+
 
   // 2. Animação de digitação do código nas abas (cURL, Node, Python)
   useEffect(() => {
@@ -365,9 +361,8 @@ export const NexusHero: React.FC<NexusHeroProps> = ({ onOpenAuth, onOpenDocs }) 
             A API de WhatsApp{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#10e5a0] via-[#22d3ee] to-[#10e5a0] bg-[length:200%_auto] animate-shine">
               mais{' '}
-              <span className="border-r-[3px] border-[#10e5a0] pr-1 animate-pulse text-[#10e5a0]">
-                {typedWord}
-              </span>
+              <span className="text-[#10e5a0]">{typedWord}</span>
+              <span className="inline-block w-[3px] h-[0.85em] bg-[#10e5a0] ml-1.5 align-middle animate-cursor-blink shadow-[0_0_8px_#10e5a0]" />
             </span>
             <br />
             para suas automações.

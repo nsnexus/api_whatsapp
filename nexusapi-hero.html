@@ -278,14 +278,16 @@
   });
 
   /* ---------- 6. Palavra digitando no título ---------- */
-  const words = ['rápida', 'estável', 'simples'], el = document.getElementById('typed');
-  let wi = 0, ci = words[0].length, del = true;
-  setInterval(() => {
-    const w = words[wi];
-    if (del) { ci--; if (ci === 0) { del = false; wi = (wi + 1) % words.length; } }
-    else { ci++; if (ci === words[wi].length) setTimeout(() => del = true, 1400); }
-    el.textContent = words[wi].slice(0, ci) || '\u200b';
-  }, 110);
+  const target = 'estável', el = document.getElementById('typed');
+  let ci = 0;
+  el.textContent = '';
+  const typeInterval = setInterval(() => {
+    ci++;
+    el.textContent = target.slice(0, ci);
+    if (ci >= target.length) {
+      clearInterval(typeInterval);
+    }
+  }, 120);
 
   /* ---------- 7. Código digitado + abas ---------- */
   const snippets = {

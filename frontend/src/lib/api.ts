@@ -1,4 +1,4 @@
-const WORKER_API_URL = import.meta.env.VITE_WORKER_API_URL || 'http://localhost:8787';
+const WORKER_API_URL = import.meta.env.VITE_WORKER_API_URL || 'https://crm-evolution-worker.narcisofelizardoconta1.workers.dev';
 
 export const api = {
   // Listar instâncias do WhatsApp (filtradas por organização)
