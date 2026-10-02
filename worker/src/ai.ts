@@ -32,6 +32,8 @@ export interface FlowStep {
   wait_condition?: string;
   media_name?: string;
   material_ids?: string[];
+  materials?: MaterialItem[];
+  bonuses?: BonusItem[];
 }
 
 export interface Course {
@@ -201,10 +203,26 @@ function convertStepsToDispatchItems(
         fileName: step.title || 'Vídeo Demonstrativo',
       });
     } else if (step.type === 'deliver_materials') {
+      let materialsList: MaterialItem[] = [];
+      if (Array.isArray(step.materials) && step.materials.length > 0) {
+        materialsList = step.materials;
+      } else if (Array.isArray(course.materials) && course.materials.length > 0) {
+        materialsList = course.materials;
+      } else if (step.content && (step.content.startsWith('http://') || step.content.startsWith('https://'))) {
+        materialsList = [
+          {
+            id: `mat_${step.id}`,
+            name: step.title || 'Apostila / Material do Curso',
+            url: step.content,
+            type: 'document',
+          },
+        ];
+      }
+
       items.push({
         type: 'deliver_materials',
         text: text.trim() ? text : undefined,
-        materialsPayload: course.materials,
+        materialsPayload: materialsList,
       });
     } else if (step.type === 'generate_pix') {
       let brCode = '';
@@ -234,12 +252,19 @@ function convertStepsToDispatchItems(
         },
       });
     } else if (step.type === 'deliver_bonus') {
+      const bonusList = (Array.isArray(step.bonuses) && step.bonuses.length > 0)
+        ? step.bonuses
+        : (course.bonuses || []);
+      const materialsList = (Array.isArray(step.materials) && step.materials.length > 0)
+        ? step.materials
+        : (course.materials || []);
+
       items.push({
         type: 'deliver_bonus',
         text: text.trim() ? text : undefined,
         bonusPayload: {
-          bonuses: course.bonuses,
-          materials: course.materials,
+          bonuses: bonusList,
+          materials: materialsList,
         },
       });
     }
@@ -844,31 +869,22 @@ Atenda-o como um instrutor prestativo e dê o suporte necessário.
       }
 
       const objectionSystemPrompt = `
-Você é o consultor de vendas oficial do curso "${activeCourse.name}".
-DESCRIÇÃO: ${activeCourse.description || 'Curso prático.'}
-PREÇO: R$ ${Number(activeCourse.price).toFixed(2)}
-CHAVE PIX: ${activeCourse.pix_key} (${activeCourse.pix_key_type})
-BENEFICIÁRIO: ${activeCourse.pix_name || 'Equipe do Curso'}
+Você é o assistente virtual do curso "${activeCourse.name}" (Preço: R$ ${Number(activeCourse.price).toFixed(2)}).
 
-PERSONA DO INSTRUTOR:
-${activeCourse.ai_persona ? activeCourse.ai_persona.replace(/<!--FLOW_STEPS:.*?-->/gs, '').trim() : 'Atenda com entusiasmo e conduza com clareza.'}
+SEU PAPEL:
+O cliente está no fluxo de atendimento/vendas e fez a seguinte pergunta ou observação fora do script: "${incomingText}".
+Sua missão é simples e direta:
+1. Responder à dúvida dele de forma objetiva, simpática, educada e curta (no máximo 2 frases breves).
+2. IMEDIATAMENTE direcionar o cliente de volta para o rumo do fluxo, reforçando o próximo passo e perguntando se pode continuar:
+"${closingQuestion}"
 
-MATERIAIS CADASTRADOS:
-${materialsStr}
-
-BÔNUS:
-${bonusesStr}
-
-QUEBRA DE OBJEÇÕES E DÚVIDAS:
-${objectionsStr}
-
-SITUAÇÃO ATUAL DO CLIENTE NO FUNIL:
+SITUAÇÃO DO CLIENTE NO FUNIL:
 ${phaseContext}
 
-REGRAS DE CONVERSAÇÃO:
-- Responda como uma pessoa real no WhatsApp (parágrafos curtos, emojis com bom senso, tom amigável).
-- NUNCA diga que é uma IA ou robô.
-- Se o cliente solicitar atendimento humano explicitamente, inclua a tag [CHAMAR_HUMANO].
+REGRAS:
+- Seja prestativo, passe confiança e fale de forma natural no WhatsApp (sem parecer um robô mecânico).
+- Seja breve e direto ao ponto. Conclua sempre puxando o cliente de volta ao fluxo.
+- Se o cliente pedir expressamente para falar com uma pessoa real, inclua a tag [CHAMAR_HUMANO].
 `.trim();
 
       const openAiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: any }> = [

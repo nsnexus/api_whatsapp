@@ -29,6 +29,24 @@ async function sendEvolutionMedia(
     urlLower.endsWith('.jpeg') ||
     urlLower.endsWith('.webp');
 
+  // Se for link externo (Drive, Hotmart, Notion, site, etc.)
+  if (
+    mat.type === 'link' ||
+    urlLower.includes('drive.google.com') ||
+    urlLower.includes('dropbox.com') ||
+    urlLower.includes('notion.site') ||
+    urlLower.includes('youtube.com') ||
+    urlLower.includes('youtu.be') ||
+    urlLower.includes('hotmart.com') ||
+    (!isAudio && !isVideo && !isImage && !urlLower.endsWith('.pdf') && !urlLower.endsWith('.zip') && !urlLower.endsWith('.docx') && !urlLower.endsWith('.doc') && !urlLower.includes('/storage/v1/object/public/'))
+  ) {
+    await evolution.sendText(instanceName, {
+      number: cleanPhone,
+      text: `📚 *${mat.name || 'Acesso ao Material'}*\n🔗 ${mat.url}`,
+    });
+    return;
+  }
+
   if (isAudio) {
     await evolution.sendWhatsAppAudio(instanceName, {
       number: cleanPhone,

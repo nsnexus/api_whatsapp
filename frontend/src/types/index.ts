@@ -161,6 +161,8 @@ export interface FlowStep {
   wait_condition?: string;
   media_name?: string;
   material_ids?: string[];
+  materials?: MaterialItem[];
+  bonuses?: BonusItem[];
 }
 
 export interface Course {

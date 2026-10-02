@@ -36,7 +36,7 @@ import {
   Camera,
   Link as LinkIcon
 } from 'lucide-react';
-import { Course, FlowStep, FlowStepType } from '../../types';
+import { Course, FlowStep, FlowStepType, MaterialItem, BonusItem } from '../../types';
 import { supabase } from '../../lib/supabase';
 
 interface FunnelFlowViewProps {
@@ -559,6 +559,291 @@ const StepMediaUploader: React.FC<StepMediaUploaderProps> = ({
   );
 };
 
+interface StepMaterialsUploaderProps {
+  materials: MaterialItem[];
+  onChange: (materials: MaterialItem[]) => void;
+  organizationId?: string;
+  label?: string;
+  description?: string;
+}
+
+const StepMaterialsUploader: React.FC<StepMaterialsUploaderProps> = ({
+  materials = [],
+  onChange,
+  organizationId,
+  label = 'Arquivos e Materiais de Entrega:',
+  description = 'Faça upload de PDFs, apostilas, vídeos ou adicione links do Google Drive / Hotmart para serem disparados automaticamente pelo robô nesta etapa.',
+}) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showAddLink, setShowAddLink] = useState(false);
+  const [linkTitle, setLinkTitle] = useState('');
+  const [linkUrl, setLinkUrl] = useState('');
+
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) {
+      setUploadError('O arquivo excede o limite máximo permitido de 50MB.');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+    setUploadProgress(`Enviando ${file.name}...`);
+
+    try {
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+      const cleanFileName = file.name
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9._-]/g, '_');
+
+      const orgFolder = organizationId || 'geral';
+      const filePath = `${orgFolder}/material_${Date.now()}_${cleanFileName}`;
+
+      const { error } = await supabase.storage
+        .from('course-materials')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (error) {
+        console.error('Erro de upload no Storage:', error);
+        throw error;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('course-materials')
+        .getPublicUrl(filePath);
+
+      let inferredType: 'document' | 'image' | 'video' | 'audio' | 'link' = 'document';
+      if (file.type.startsWith('image/') || ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(fileExt)) {
+        inferredType = 'image';
+      } else if (file.type.startsWith('video/') || ['mp4', 'mov', 'webm'].includes(fileExt)) {
+        inferredType = 'video';
+      } else if (file.type.startsWith('audio/') || ['mp3', 'm4a', 'wav', 'ogg'].includes(fileExt)) {
+        inferredType = 'audio';
+      }
+
+      const baseName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+      const cleanTitle = baseName.charAt(0).toUpperCase() + baseName.slice(1);
+
+      const newItem: MaterialItem = {
+        id: `mat_${Date.now()}`,
+        name: cleanTitle,
+        url: publicUrl,
+        type: inferredType,
+        description: `${file.name} (${formatBytes(file.size)})`,
+      };
+
+      onChange([...materials, newItem]);
+    } catch (err: any) {
+      console.error('Falha ao subir material:', err);
+      setUploadError(err.message || 'Erro ao enviar arquivo para o storage.');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleAddExternalLink = () => {
+    if (!linkTitle.trim() || !linkUrl.trim()) return;
+    const newItem: MaterialItem = {
+      id: `link_${Date.now()}`,
+      name: linkTitle.trim(),
+      url: linkUrl.trim(),
+      type: 'link',
+      description: 'Link Externo (Drive / Área de Membros)',
+    };
+    onChange([...materials, newItem]);
+    setLinkTitle('');
+    setLinkUrl('');
+    setShowAddLink(false);
+  };
+
+  const handleRemoveItem = (id: string) => {
+    onChange(materials.filter((m) => m.id !== id));
+  };
+
+  return (
+    <div className="space-y-3 p-4 bg-slate-950/60 border border-slate-800 rounded-2xl">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="*/*"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleFileUpload(f);
+        }}
+        className="hidden"
+      />
+
+      <div className="flex items-center justify-between">
+        <div>
+          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+            <Package className="w-3.5 h-3.5 text-blue-400" />
+            {label}
+          </label>
+          <p className="text-[10px] text-slate-400 mt-0.5">{description}</p>
+        </div>
+        <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-semibold border border-blue-500/30">
+          {materials.length} {materials.length === 1 ? 'item' : 'itens'}
+        </span>
+      </div>
+
+      {/* Lista de Materiais Anexados */}
+      {materials.length > 0 && (
+        <div className="space-y-2 pt-1">
+          {materials.map((mat) => {
+            const isDoc = mat.type === 'document' || !mat.type;
+            const isVid = mat.type === 'video';
+            const isImg = mat.type === 'image';
+            const isAud = mat.type === 'audio';
+            const isLnk = mat.type === 'link';
+
+            return (
+              <div
+                key={mat.id}
+                className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-[#111726] border border-slate-800 hover:border-slate-700 transition-colors"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 flex-shrink-0">
+                    {isDoc && <FileText className="w-3.5 h-3.5" />}
+                    {isVid && <Video className="w-3.5 h-3.5 text-purple-400" />}
+                    {isImg && <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />}
+                    {isAud && <Mic className="w-3.5 h-3.5 text-teal-400" />}
+                    {isLnk && <LinkIcon className="w-3.5 h-3.5 text-amber-400" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-white truncate">{mat.name}</p>
+                    <p className="text-[10px] text-slate-400 truncate font-mono">
+                      {mat.description || mat.url}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <a
+                    href={mat.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                    title="Visualizar / Testar Link"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveItem(mat.id)}
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors"
+                    title="Remover material"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Botões de Ação para Adicionar Material */}
+      <div className="flex flex-wrap items-center gap-2 pt-2">
+        <button
+          type="button"
+          disabled={isUploading}
+          onClick={() => fileInputRef.current?.click()}
+          className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm disabled:opacity-50"
+        >
+          {isUploading ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <UploadCloud className="w-3.5 h-3.5" />
+          )}
+          <span>{isUploading ? uploadProgress : 'Subir Arquivo / PDF do Celular ou PC'}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowAddLink(!showAddLink)}
+          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+        >
+          <LinkIcon className="w-3.5 h-3.5" />
+          <span>{showAddLink ? 'Fechar Link' : 'Adicionar Link do Google Drive / Membros'}</span>
+        </button>
+      </div>
+
+      {uploadError && (
+        <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <span>{uploadError}</span>
+        </div>
+      )}
+
+      {/* Form de Adicionar Link Manual */}
+      {showAddLink && (
+        <div className="p-3 bg-[#111726] border border-slate-800 rounded-xl space-y-2.5 mt-2 animate-fadeIn">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1">
+                Nome do Material / Acesso:
+              </label>
+              <input
+                type="text"
+                value={linkTitle}
+                onChange={(e) => setLinkTitle(e.target.value)}
+                placeholder="Ex: Pasta Google Drive com Apostilas"
+                className="w-full bg-[#161c2d] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1">
+                Link URL:
+              </label>
+              <input
+                type="text"
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                placeholder="https://drive.google.com/..."
+                className="w-full bg-[#161c2d] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-blue-500 font-mono"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setShowAddLink(false)}
+              className="px-2.5 py-1 rounded-lg text-xs text-slate-400 hover:text-white"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleAddExternalLink}
+              disabled={!linkTitle.trim() || !linkUrl.trim()}
+              className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold disabled:opacity-50"
+            >
+              Adicionar ao Fluxo
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const FunnelFlowView: React.FC<FunnelFlowViewProps> = ({ 
   courses, 
   onOpenSimulator,
@@ -585,9 +870,24 @@ export const FunnelFlowView: React.FC<FunnelFlowViewProps> = ({
       return;
     }
 
+    // Helper para enriquecer passos com os materiais já cadastrados no curso se estiverem vazios
+    const enrich = (loadedSteps: FlowStep[]): FlowStep[] => {
+      return loadedSteps.map((s) => {
+        if (
+          s.type === 'deliver_materials' &&
+          (!s.materials || s.materials.length === 0) &&
+          currentCourse.materials &&
+          currentCourse.materials.length > 0
+        ) {
+          return { ...s, materials: [...currentCourse.materials] };
+        }
+        return s;
+      });
+    };
+
     // 1. Tenta pegar de flow_steps
     if (currentCourse.flow_steps && currentCourse.flow_steps.length > 0) {
-      setSteps(currentCourse.flow_steps);
+      setSteps(enrich(currentCourse.flow_steps));
       setIsDirty(false);
       return;
     }
@@ -599,7 +899,7 @@ export const FunnelFlowView: React.FC<FunnelFlowViewProps> = ({
         try {
           const parsed = JSON.parse(match[1]);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setSteps(parsed);
+            setSteps(enrich(parsed));
             setIsDirty(false);
             return;
           }
@@ -619,6 +919,7 @@ export const FunnelFlowView: React.FC<FunnelFlowViewProps> = ({
       content: s.type === 'text' && idx === 1
         ? `Olá! Sou consultor oficial do curso *${currentCourse.name}*. Eu confio tanto na honestidade das pessoas e na qualidade do nosso conteúdo que vou fazer algo especial: posso te mandar os materiais agora mesmo para você conferir antes de pagar? O valor é apenas R$ ${Number(currentCourse.price).toFixed(2)}. Posso te mandar?`
         : s.content,
+      materials: s.type === 'deliver_materials' && currentCourse.materials?.length ? [...currentCourse.materials] : undefined,
     }));
 
     setSteps(defaultSteps);
@@ -767,15 +1068,31 @@ export const FunnelFlowView: React.FC<FunnelFlowViewProps> = ({
 
       const personaWithFlow = `${cleanPersona}\n\n<!--FLOW_STEPS:${JSON.stringify(steps)}-->`;
 
+      // Extrai todos os materiais configurados nos passos de entrega para sincronizar com o curso
+      const allStepMaterials: MaterialItem[] = [];
+      for (const s of steps) {
+        if (s.materials && Array.isArray(s.materials)) {
+          for (const m of s.materials) {
+            if (!allStepMaterials.some((existing) => existing.url === m.url)) {
+              allStepMaterials.push(m);
+            }
+          }
+        }
+      }
+
       if (onSaveCourse) {
         await onSaveCourse({
           id: currentCourse.id,
           ai_persona: personaWithFlow,
+          materials: allStepMaterials.length > 0 ? allStepMaterials : (currentCourse.materials || []),
         });
       }
 
       // Atualiza localmente o curso selecionado para refletir a persona salva
       currentCourse.ai_persona = personaWithFlow;
+      if (allStepMaterials.length > 0) {
+        currentCourse.materials = allStepMaterials;
+      }
 
       setIsDirty(false);
       setSaveSuccess(true);
@@ -1124,14 +1441,22 @@ export const FunnelFlowView: React.FC<FunnelFlowViewProps> = ({
                       )}
 
                       {step.type === 'wait_reply' && (
-                        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 flex items-center gap-2.5">
-                          <Clock className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                          <div>
-                            <span className="font-bold">O robô pausa o envio e aguarda a mensagem do cliente.</span>
-                            <p className="text-[11px] text-amber-300/80 mt-0.5">
-                              Condição esperada: <b>{step.wait_condition || 'Qualquer confirmação'}</b>
-                            </p>
+                        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                              <span className="font-bold">Aguardando Resposta do Cliente</span>
+                            </div>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">
+                              🤖 IA Intervém se Houver Dúvida
+                            </span>
                           </div>
+                          <p className="text-[11px] text-amber-300/90">
+                            Condição esperada: <b>{step.wait_condition || 'Confirmação (Sim / Pode mandar / Quero)'}</b>
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            ⚡ Se o cliente confirmar, o robô avança 100% automático. Se fizer pergunta, a IA responde curto e puxa de volta ao fluxo.
+                          </p>
                         </div>
                       )}
 
@@ -1153,26 +1478,57 @@ export const FunnelFlowView: React.FC<FunnelFlowViewProps> = ({
                       )}
 
                       {step.type === 'deliver_materials' && (
-                        <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-xs text-blue-200 space-y-1.5">
+                        <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-xs text-blue-200 space-y-2">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <Package className="w-4 h-4 text-blue-400" />
                               <span className="font-bold">Entrega Automática dos Materiais</span>
                             </div>
-                            <span className="text-[10px] text-blue-300">
-                              {currentCourse?.materials?.length || 0} arquivos configurados
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-semibold border border-blue-500/30">
+                              {(step.materials?.length || 0)} arquivos anexados
                             </span>
                           </div>
+                          {step.materials && step.materials.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 pt-0.5">
+                              {step.materials.map((m) => (
+                                <span
+                                  key={m.id}
+                                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-blue-950/70 border border-blue-500/30 text-[10px] text-blue-200"
+                                >
+                                  <FileText className="w-3 h-3 text-blue-400" />
+                                  <span className="font-medium truncate max-w-[200px]">{m.name}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           {step.content && <p className="text-[11px] text-blue-200/80 italic">{step.content}</p>}
                         </div>
                       )}
 
                       {step.type === 'deliver_bonus' && (
-                        <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-200 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <Gift className="w-4 h-4 text-rose-400" />
-                            <span className="font-bold">Liberação do Super Bônus</span>
+                        <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-200 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Gift className="w-4 h-4 text-rose-400" />
+                              <span className="font-bold">Liberação do Super Bônus</span>
+                            </div>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-semibold border border-rose-500/30">
+                              {(step.materials?.length || 0)} bônus anexados
+                            </span>
                           </div>
+                          {step.materials && step.materials.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 pt-0.5">
+                              {step.materials.map((m) => (
+                                <span
+                                  key={m.id}
+                                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-rose-950/70 border border-rose-500/30 text-[10px] text-rose-200"
+                                >
+                                  <Gift className="w-3 h-3 text-rose-400" />
+                                  <span className="font-medium truncate max-w-[200px]">{m.name}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           {step.content && <p className="text-[11px] text-rose-200/80 italic">{step.content}</p>}
                         </div>
                       )}
@@ -1269,35 +1625,95 @@ export const FunnelFlowView: React.FC<FunnelFlowViewProps> = ({
                       )}
 
                       {step.type === 'wait_reply' && (
-                        <div>
-                          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                            Resposta esperada do cliente para continuar o fluxo:
-                          </label>
-                          <input
-                            type="text"
-                            value={step.wait_condition || ''}
-                            onChange={(e) => handleUpdateStep(step.id, { wait_condition: e.target.value })}
-                            className="w-full bg-[#111726] border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-200 outline-none focus:border-emerald-500 transition-all"
-                            placeholder="Ex: Confirmação (Sim / Pode mandar / Quero)"
-                          />
-                          <p className="text-[10px] text-amber-300 mt-1.5">
-                            Quando o cliente responder, o robô avança imediatamente para o próximo bloco da sequência.
-                          </p>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                              Resposta esperada do cliente para continuar o fluxo:
+                            </label>
+                            <input
+                              type="text"
+                              value={step.wait_condition || ''}
+                              onChange={(e) => handleUpdateStep(step.id, { wait_condition: e.target.value })}
+                              className="w-full bg-[#111726] border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-200 outline-none focus:border-emerald-500 transition-all"
+                              placeholder="Ex: Confirmação (Sim / Pode mandar / Quero)"
+                            />
+                          </div>
+
+                          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-1.5">
+                            <div className="flex items-center gap-2 font-bold text-amber-300">
+                              <Sparkles className="w-4 h-4 text-amber-400" />
+                              <span>Como a Inteligência Artificial atua nesta etapa:</span>
+                            </div>
+                            <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                              • <b>Se o cliente confirmar</b> (ex: <i>"Sim"</i>, <i>"Pode mandar"</i>, <i>"Quero"</i>, <i>"Ok"</i>): O robô avança imediatamente e 100% automático para o próximo passo.<br />
+                              • <b>Se o cliente fizer uma pergunta ou dúvida</b> (ex: <i>"É seguro?"</i>, <i>"Tem garantia?"</i>, <i>"Como funciona no celular?"</i>): A IA intervém apenas para responder de forma breve (1 a 2 frases) e imediatamente direciona o cliente de volta para o rumo do funil!
+                            </p>
+                          </div>
                         </div>
                       )}
 
-                      {(step.type === 'generate_pix' || step.type === 'deliver_materials' || step.type === 'deliver_bonus') && (
+                      {step.type === 'generate_pix' && (
                         <div>
                           <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                            Texto da Mensagem de Acompanhamento:
+                            Texto da Mensagem de Cobrança PIX:
                           </label>
                           <textarea
                             rows={3}
                             value={step.content || ''}
                             onChange={(e) => handleUpdateStep(step.id, { content: e.target.value })}
                             className="w-full bg-[#111726] border border-slate-800 rounded-xl p-3 text-xs text-slate-200 outline-none focus:border-emerald-500 transition-all"
-                            placeholder="Mensagem explicativa que vai junto..."
+                            placeholder="Mensagem explicativa com os dados PIX e bônus..."
                           />
+                        </div>
+                      )}
+
+                      {step.type === 'deliver_materials' && (
+                        <div className="space-y-4">
+                          <StepMaterialsUploader
+                            materials={step.materials || []}
+                            onChange={(newMats) => handleUpdateStep(step.id, { materials: newMats })}
+                            organizationId={currentCourse?.organization_id}
+                            label="Arquivos e Apostilas para Entrega nesta Etapa:"
+                            description="Faça upload dos PDFs, apostilas ou links externos que serão entregues automaticamente pelo robô nesta etapa do funil."
+                          />
+
+                          <div>
+                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                              Texto da Mensagem que Acompanha a Entrega dos Materiais:
+                            </label>
+                            <textarea
+                              rows={3}
+                              value={step.content || ''}
+                              onChange={(e) => handleUpdateStep(step.id, { content: e.target.value })}
+                              className="w-full bg-[#111726] border border-slate-800 rounded-xl p-3 text-xs text-slate-200 outline-none focus:border-emerald-500 transition-all"
+                              placeholder="Aqui estão seus materiais completos! Bons estudos! 📚✨"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {step.type === 'deliver_bonus' && (
+                        <div className="space-y-4">
+                          <StepMaterialsUploader
+                            materials={step.materials || []}
+                            onChange={(newMats) => handleUpdateStep(step.id, { materials: newMats })}
+                            organizationId={currentCourse?.organization_id}
+                            label="Arquivos / Super Bônus para Liberação:"
+                            description="Faça upload das aulas bônus, e-books ou cole links do Google Drive / Área de Membros para liberar após a confirmação do PIX."
+                          />
+
+                          <div>
+                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                              Texto da Mensagem de Liberação do Bônus:
+                            </label>
+                            <textarea
+                              rows={3}
+                              value={step.content || ''}
+                              onChange={(e) => handleUpdateStep(step.id, { content: e.target.value })}
+                              className="w-full bg-[#111726] border border-slate-800 rounded-xl p-3 text-xs text-slate-200 outline-none focus:border-emerald-500 transition-all"
+                              placeholder="Parabéns pela compra! Segue seu Super Bônus exclusivo acima! 🎁"
+                            />
+                          </div>
                         </div>
                       )}
                     </div>

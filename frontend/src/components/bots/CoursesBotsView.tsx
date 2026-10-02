@@ -482,41 +482,36 @@ export const CoursesBotsView: React.FC<CoursesBotsViewProps> = ({
                         {c.description || 'Sem descrição cadastrada.'}
                       </p>
 
-                      {/* Chips de Gatilhos */}
-                      <div className="mb-4">
-                        <span className="text-[10px] font-bold uppercase text-slate-500 block mb-1.5">
-                          Gatilhos de Ativação:
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {(c.triggers || []).slice(0, 3).map((trig) => (
-                            <span
-                              key={trig}
-                              className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-emerald-300 font-mono"
-                            >
-                              #{trig}
-                            </span>
-                          ))}
-                          {(c.triggers || []).length > 3 && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400">
-                              +{(c.triggers || []).length - 3}
-                            </span>
-                          )}
-                          {(c.triggers || []).length === 0 && (
-                            <span className="text-[10px] text-slate-500 italic">Nenhum gatilho</span>
-                          )}
+                      {/* Cobrança PIX e Ativação */}
+                      <div className="mb-4 space-y-2">
+                        <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-900 border border-slate-800 text-[11px] text-slate-300">
+                          <CreditCard className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                          <span className="text-slate-400">PIX:</span>
+                          <span className="font-mono text-white truncate">{c.pix_key || 'Não configurada'}</span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 uppercase font-mono">
+                            {c.pix_key_type || 'phone'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 text-[11px] text-emerald-400/90 font-medium">
+                          <Zap className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                          <span>Ativação automática via link de anúncio</span>
                         </div>
                       </div>
 
-                      {/* Métricas do Funil: Materiais & Bônus */}
-                      <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-800/80 mb-4">
-                        <div className="flex items-center gap-1.5 text-xs text-slate-300">
-                          <FileText className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-                          <span>{(c.materials || []).length} Amostras</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs text-slate-300">
-                          <Gift className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                          <span>{(c.bonuses || []).length} Bônus</span>
-                        </div>
+                      {/* Botão de Acesso Rápido ao Fluxo */}
+                      <div className="mb-4">
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('fluxo')}
+                          className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white flex items-center justify-between transition-colors"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Workflow className="w-3.5 h-3.5 text-teal-400" />
+                            <span>Configurar Fluxo & Materiais</span>
+                          </span>
+                          <span className="text-[10px] text-emerald-400 font-bold">Abrir ➔</span>
+                        </button>
                       </div>
                     </div>
 
