@@ -8,7 +8,6 @@ import {
   ShieldAlert, 
   ShieldCheck,
   ExternalLink, 
-  MessageSquare, 
   LogOut,
   Sparkles,
   Terminal,
@@ -29,7 +28,6 @@ export type NavigationTab =
   | 'docs' 
   | 'playground' 
   | 'webhooks'
-  | 'chat' 
   | 'bots'
   | 'admin';
 
@@ -296,28 +294,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-md font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 GPT-5.6 Luna
               </span>
-            </button>
-
-            {/* Monitor de Conversas (Live Chat) */}
-            <button
-              onClick={() => onSelectTab('chat')}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
-                currentTab === 'chat'
-                  ? 'bg-purple-500/15 text-purple-300 font-semibold border-l-2 border-purple-400'
-                  : 'text-slate-300 hover:text-white hover:bg-purple-950/30'
-              }`}
-            >
-              <MessageSquare className="w-4 h-4 flex-shrink-0 text-blue-400" />
-              <span>Monitor de Conversas</span>
-              {unreadCount > 0 ? (
-                <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500 text-slate-950">
-                  {unreadCount}
-                </span>
-              ) : (
-                <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-md font-bold bg-blue-500/20 text-blue-300">
-                  Ao Vivo
-                </span>
-              )}
             </button>
 
             {/* Painel Admin Master */}
