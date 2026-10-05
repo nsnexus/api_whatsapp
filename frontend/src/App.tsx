@@ -1,18 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { Sidebar, NavigationTab } from './components/layout/Sidebar';
-import { InstanceList } from './components/instances/InstanceList';
-import { ApiPlayground } from './components/wapi/ApiPlayground';
-import { ApiKeysView } from './components/wapi/ApiKeysView';
-import { InvoicesView } from './components/wapi/InvoicesView';
-import { AntiBanGuideView } from './components/wapi/AntiBanGuideView';
-import { ApiDocsView } from './components/wapi/ApiDocsView';
 import { LandingPageView } from './components/landing/LandingPageView';
 import { AuthModal } from './components/auth/AuthModal';
-import { CoursesBotsView } from './components/bots/CoursesBotsView';
-import { AdminDashboardView } from './components/admin/AdminDashboardView';
 import { api } from './lib/api';
 import { supabase } from './lib/supabase';
 import { Instance } from './types';
+
+// Lazy loading das abas internas autenticadas (reduz drasticamente o bundle inicial do site no mobile)
+const InstanceList = lazy(() => import('./components/instances/InstanceList').then(m => ({ default: m.InstanceList })));
+const ApiPlayground = lazy(() => import('./components/wapi/ApiPlayground').then(m => ({ default: m.ApiPlayground })));
+const ApiKeysView = lazy(() => import('./components/wapi/ApiKeysView').then(m => ({ default: m.ApiKeysView })));
+const InvoicesView = lazy(() => import('./components/wapi/InvoicesView').then(m => ({ default: m.InvoicesView })));
+const AntiBanGuideView = lazy(() => import('./components/wapi/AntiBanGuideView').then(m => ({ default: m.AntiBanGuideView })));
+const ApiDocsView = lazy(() => import('./components/wapi/ApiDocsView').then(m => ({ default: m.ApiDocsView })));
+const CoursesBotsView = lazy(() => import('./components/bots/CoursesBotsView').then(m => ({ default: m.CoursesBotsView })));
+const AdminDashboardView = lazy(() => import('./components/admin/AdminDashboardView').then(m => ({ default: m.AdminDashboardView })));
 
 // Rastreamento de acessos ao site em tempo real para o Painel Admin
 function trackSiteVisit(page: string) {
@@ -365,18 +367,24 @@ export const App: React.FC = () => {
   if (currentTab === 'docs') {
     return (
       <div className="flex h-screen w-screen overflow-hidden bg-[#0a0d14] text-slate-100">
-        <ApiDocsView 
-          instances={instances} 
-          onNavigateTab={(tab) => {
-            if (tab === 'landing') {
-              window.history.pushState(null, '', window.location.pathname);
-              selectTab('landing');
-            } else {
-              window.history.pushState(null, '', '#app');
-              setCurrentTab(tab);
-            }
-          }}
-        />
+        <Suspense fallback={
+          <div className="flex-1 flex items-center justify-center bg-[#0a0d14]">
+            <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        }>
+          <ApiDocsView 
+            instances={instances} 
+            onNavigateTab={(tab) => {
+              if (tab === 'landing') {
+                window.history.pushState(null, '', window.location.pathname);
+                selectTab('landing');
+              } else {
+                window.history.pushState(null, '', '#app');
+                setCurrentTab(tab);
+              }
+            }}
+          />
+        </Suspense>
       </div>
     );
   }
@@ -393,42 +401,48 @@ export const App: React.FC = () => {
 
       {/* Conteúdo da Aba Atual */}
       <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#0e131f]">
-        {currentTab === 'instances' && (
-          <InstanceList
-            instances={instances}
-            onCreateInstance={handleCreateInstance}
-            onRefreshQr={handleRefreshQr}
-            onNavigateTab={setCurrentTab}
-            onReloadInstances={loadRealInstances}
-          />
-        )}
+        <Suspense fallback={
+          <div className="flex-1 flex items-center justify-center bg-[#0e131f]">
+            <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        }>
+          {currentTab === 'instances' && (
+            <InstanceList
+              instances={instances}
+              onCreateInstance={handleCreateInstance}
+              onRefreshQr={handleRefreshQr}
+              onNavigateTab={setCurrentTab}
+              onReloadInstances={loadRealInstances}
+            />
+          )}
 
-        {currentTab === 'keys' && (
-          <ApiKeysView instances={instances} />
-        )}
+          {currentTab === 'keys' && (
+            <ApiKeysView instances={instances} />
+          )}
 
-        {currentTab === 'invoices' && (
-          <InvoicesView instances={instances} />
-        )}
+          {currentTab === 'invoices' && (
+            <InvoicesView instances={instances} />
+          )}
 
-        {currentTab === 'antiban' && (
-          <AntiBanGuideView />
-        )}
+          {currentTab === 'antiban' && (
+            <AntiBanGuideView />
+          )}
 
-        {currentTab === 'playground' && (
-          <ApiPlayground instances={instances} />
-        )}
+          {currentTab === 'playground' && (
+            <ApiPlayground instances={instances} />
+          )}
 
-        {currentTab === 'admin' && isAdmin && (
-          <AdminDashboardView />
-        )}
+          {currentTab === 'admin' && isAdmin && (
+            <AdminDashboardView />
+          )}
 
-        {currentTab === 'bots' && isAdmin && (
-          <CoursesBotsView
-            organizationId={currentOrgId}
-            instances={instances}
-          />
-        )}
+          {currentTab === 'bots' && isAdmin && (
+            <CoursesBotsView
+              organizationId={currentOrgId}
+              instances={instances}
+            />
+          )}
+        </Suspense>
       </main>
 
       {/* Modal de Autenticação / Cadastro com Google disponível de qualquer lugar */}
