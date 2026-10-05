@@ -305,6 +305,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Bottom Profile (Narciso Santos) */}
       <div className="p-4 border-t border-slate-800/80 space-y-3">
+        {/* Botão Suporte via WhatsApp */}
+        <a
+          href="https://wa.me/5594991064043?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20no%20painel%20da%20NexusAPI."
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 border border-[#25D366]/20 transition-all group"
+        >
+          <span className="flex items-center gap-2">
+            <Smartphone className="w-4 h-4 text-[#25D366]" />
+            <span>Suporte WhatsApp</span>
+          </span>
+          <ExternalLink className="w-3.5 h-3.5 text-[#25D366] group-hover:translate-x-0.5 transition-transform" />
+        </a>
+
         {/* Botão Ver Landing Page */}
         <button
           type="button"
