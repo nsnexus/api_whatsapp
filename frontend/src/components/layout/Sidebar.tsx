@@ -50,25 +50,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const checkAdmin = async (u: User | null) => {
-      if (!u) {
+    const checkAdmin = (u: User | null) => {
+      if (!u || !u.email) {
         setIsAdmin(false);
         return;
       }
-      if (u.email === 'narcisofelizardo@gmail.com') {
-        setIsAdmin(true);
-        return;
-      }
-      try {
-        const { data } = await supabase.from('profiles').select('role').eq('id', u.id).maybeSingle();
-        if (data?.role === 'superadmin' || data?.role === 'admin') {
-          setIsAdmin(true);
-        } else {
-          setIsAdmin(false);
-        }
-      } catch {
-        setIsAdmin(false);
-      }
+      const email = u.email.trim().toLowerCase();
+      setIsAdmin(email === 'narcisofelizardo@gmail.com');
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => {

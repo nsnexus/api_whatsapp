@@ -66,21 +66,13 @@ export const App: React.FC = () => {
   }, [currentOrgId]);
 
   useEffect(() => {
-    const checkAdmin = async (u: any) => {
-      if (!u) {
+    const checkAdmin = (u: any) => {
+      if (!u || !u.email) {
         setIsAdmin(false);
         return;
       }
-      if (u.email === 'narcisofelizardo@gmail.com') {
-        setIsAdmin(true);
-        return;
-      }
-      try {
-        const { data } = await supabase.from('profiles').select('role').eq('id', u.id).maybeSingle();
-        setIsAdmin(data?.role === 'superadmin' || data?.role === 'admin');
-      } catch {
-        setIsAdmin(false);
-      }
+      const email = String(u.email).trim().toLowerCase();
+      setIsAdmin(email === 'narcisofelizardo@gmail.com');
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -427,11 +419,11 @@ export const App: React.FC = () => {
           <ApiPlayground instances={instances} />
         )}
 
-        {currentTab === 'admin' && (
+        {currentTab === 'admin' && isAdmin && (
           <AdminDashboardView />
         )}
 
-        {currentTab === 'bots' && (
+        {currentTab === 'bots' && isAdmin && (
           <CoursesBotsView
             organizationId={currentOrgId}
             instances={instances}
