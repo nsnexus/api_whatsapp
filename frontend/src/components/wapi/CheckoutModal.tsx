@@ -155,6 +155,39 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     return () => clearInterval(timer);
   }, [isOpen, currentStep]);
 
+  const triggerSuccessConversion = (transactionId: string) => {
+    setCurrentStep('success');
+    window.history.replaceState(null, '', '#compra-sucesso');
+
+    if (typeof window !== 'undefined' && (window as any).gtag) {
+      try {
+        (window as any).gtag('event', 'purchase', {
+          transaction_id: transactionId,
+          value: priceNumber,
+          currency: 'BRL',
+          items: [{
+            item_name: currentPlan.name,
+            item_id: selectedPlanId,
+            price: priceNumber,
+            quantity: 1
+          }]
+        });
+        (window as any).gtag('event', 'conversion', {
+          send_to: 'AW-18489833665',
+          value: priceNumber,
+          currency: 'BRL',
+          transaction_id: transactionId
+        });
+      } catch (e) {
+        console.warn('Erro ao disparar evento gtag:', e);
+      }
+    }
+
+    if (onPaymentSuccess && instance) {
+      onPaymentSuccess(instance.id, currentPlan.name);
+    }
+  };
+
   // Polling automático para verificar liquidação na Efí
   useEffect(() => {
     if (!isOpen || currentStep !== 'pix_details' || !txid || provider !== 'efi') return;
@@ -164,12 +197,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         const res = await fetch(`${workerUrl}/api/payments/pix/status/${txid}`);
         if (res.ok) {
           const data = await res.json();
-          if (data.isPaid || data.status === 'CONCLUIDA') {
+          if (data.isPaid || data.status === 'CONCLUIDA' || data.status === 'PAID') {
             clearInterval(interval);
-            setCurrentStep('success');
-            if (onPaymentSuccess && instance) {
-              onPaymentSuccess(instance.id, currentPlan.name);
-            }
+            triggerSuccessConversion(txid);
           }
         }
       } catch (e) {
@@ -209,10 +239,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       if (res.ok) {
         const data = await res.json();
         if (data.isPaid || data.status === 'CONCLUIDA' || data.status === 'PAID') {
-          setCurrentStep('success');
-          if (onPaymentSuccess && instance) {
-            onPaymentSuccess(instance.id, currentPlan.name);
-          }
+          triggerSuccessConversion(txid);
           return;
         } else {
           setVerifyError('Pagamento ainda não identificado pela instituição bancária. Se você acabou de pagar pelo app do seu banco, aguarde cerca de 10 a 20 segundos e tente clicar novamente.');

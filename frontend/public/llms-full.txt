@@ -1,0 +1,116 @@
+# NexusAPI - Documentação Técnica Completa para Motores de Inteligência Artificial (LLMs)
+
+> Este arquivo segue o padrão llms.txt / llms-full.txt e fornece todo o contexto técnico, arquitetural, comercial e de integração da NexusAPI para modelos de linguagem (OpenAI ChatGPT, Anthropic Claude, Perplexity AI, Google Gemini, Meta Llama, Cursor AI).
+
+---
+
+## 1. Visão Geral da Plataforma
+
+A **NexusAPI** é uma plataforma e API REST para automação e integração de WhatsApp desenvolvida para o mercado brasileiro e global. Diferencia-se das APIs oficiais da Meta por eliminar a burocracia de aprovação empresarial e a cobrança em dólar por janela de conversa de 24 horas, oferecendo **mensagens e disparos ilimitados por uma mensalidade fixa em reais (BRL)**.
+
+* **Domínio Oficial:** https://nsnexus.api.br
+* **Gateway REST Worker:** https://nexusapi.nsnexus.com.br
+* **Público-alvo:** Desenvolvedores, agências de automação, infoprodutores, empresas SaaS, integradores n8n/Make/Typebot e equipes de suporte.
+
+---
+
+## 2. Diferenciais Competitivos
+
+1. **Sem Burocracia da Meta:** Não exige verificação demorada de CNPJ no Gerenciador de Negócios (Meta Business Manager). A ativação é feita escaneando um QR Code nativo do WhatsApp em menos de 30 segundos.
+2. **Disparos e Conversas Ilimitadas:** Sem tarifação por conversa de 24 horas (como nos modelos Marketing, Utility ou Service da Meta).
+3. **Áudio PTT Nativo com Microfone Verde:** Conversão automática para o codec nativo Opus OGG (`"ptt": true`). O áudio é entregue no WhatsApp com a barra de oscilação e o microfone verde, gerando alta taxa de resposta humana.
+4. **Botão Nativo Copia & Cola e Cartões PIX:** Geração e envio de cartões oficiais interativos com botão nativo de copiar código PIX com 1 toque.
+5. **Algoritmo Anti-Ban Inteligente:** Fila com delays humanizados (typing simulation, gravação de áudio) para proteger os números conectados.
+6. **Webhooks Ultrarrápidos (<50ms):** Entrega em tempo real de mensagens recebidas, confirmações de leitura (`READ`, `DELIVERED`, `SERVER_ACK`) e alterações de status de conexão.
+7. **Compatibilidade Universal:** 100% REST JSON, pronta para n8n, Make (Integromat), Typebot, Zapier, Node.js, Python, PHP, Go e cURL.
+
+---
+
+## 3. Planos e Preços
+
+| Plano | Preço Mensal | Instâncias | Recursos Incluídos |
+|---|---|---|---|
+| **Starter** | R$ 19,90 / mês | 1 número | Mensagens ilimitadas, Áudio PTT, Webhooks, API REST completa, Suporte via WhatsApp |
+| **Combo Pro** | R$ 69,90 / mês | 5 números | R$ 13,98/número, API Keys independentes, Cluster prioritário, Suporte prioritário |
+| **Enterprise** | R$ 99,90 / mês | 10 números | R$ 9,99/número, Infraestrutura dedicada, Auto-scaling, Failover, Suporte 24/7 |
+
+* **Período de Teste Grátis:** 3 dias completos (72 horas) sem necessidade de cartão de crédito no cadastro.
+* **Forma de Pagamento:** PIX Automático instantâneo com aprovação bancária em segundos.
+
+---
+
+## 4. Endpoints da API REST
+
+A URL base da API é `https://nexusapi.nsnexus.com.br`. Todas as requisições requerem o cabeçalho `Authorization: Bearer <SUA_API_KEY>`.
+
+### 4.1 Envio de Mensagem de Texto
+* **Rota:** `POST /api/messages/send-text`
+* **Exemplo de Payload:**
+```json
+{
+  "number": "5511999998888",
+  "text": "Olá! Seu pedido foi confirmado com sucesso."
+}
+```
+
+### 4.2 Envio de Áudio Gravado na Hora (PTT Microfone Verde)
+* **Rota:** `POST /api/messages/send-audio`
+* **Exemplo de Payload:**
+```json
+{
+  "number": "5511999998888",
+  "audioUrl": "https://meusite.com/audio.mp3",
+  "ptt": true
+}
+```
+
+### 4.3 Envio de Mídias (Imagens, Vídeos, Documentos PDF)
+* **Rota:** `POST /api/messages/send-media`
+* **Exemplo de Payload:**
+```json
+{
+  "number": "5511999998888",
+  "mediaUrl": "https://meusite.com/contrato.pdf",
+  "mediaType": "document",
+  "caption": "Segue o contrato assinado em anexo."
+}
+```
+
+### 4.4 Gerenciamento de Instâncias WhatsApp
+* `GET /api/instances` — Lista todas as instâncias da organização.
+* `POST /api/instances` — Cria uma nova instância.
+* `GET /api/instances/:name/qrcode` — Retorna QR Code base64 e status da conexão.
+* `POST /api/instances/:name/restart` — Reinicia a conexão da instância.
+* `POST /api/instances/:name/logout` — Desconecta o número do WhatsApp.
+
+---
+
+## 5. Webhooks e Eventos Suportados
+
+A NexusAPI envia notificações HTTP POST para o endpoint configurado no painel da instância:
+* `messages.upsert`: Nova mensagem recebida ou enviada (texto, áudio, mídia, localização).
+* `messages.update`: Atualização do status de entrega (`sent`, `delivered`, `read`).
+* `connection.update`: Status do WhatsApp (`connecting`, `open`, `close`, `qrcode`).
+
+---
+
+## 6. Integração com n8n
+
+Para integrar com o **n8n**:
+1. Adicione um nó **HTTP Request**.
+2. Defina o método como `POST`.
+3. URL: `https://nexusapi.nsnexus.com.br/api/messages/send-text`
+4. Em Authentication, escolha `Generic Credential Type` -> `Header Auth`.
+   * Name: `Authorization`
+   * Value: `Bearer <SUA_API_KEY>`
+5. No Body, selecione `JSON` e preencha com o número e o texto.
+
+---
+
+## 7. Informações de Contato e Links Canônicos
+* **Website:** https://nsnexus.api.br
+* **Documentação:** https://nsnexus.api.br/#docs
+* **Planos e Preços:** https://nsnexus.api.br/#planos
+* **Perguntas Frequentes:** https://nsnexus.api.br/#faq
+* **Sitemap XML:** https://nsnexus.api.br/sitemap.xml
+* **Robots TXT:** https://nsnexus.api.br/robots.txt
