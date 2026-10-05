@@ -13,7 +13,8 @@ import {
   Lock, 
   Sparkles,
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 import { Instance } from '../../types';
 
@@ -44,6 +45,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [dynamicQrCodeUrl, setDynamicQrCodeUrl] = useState<string>('');
   const [txid, setTxid] = useState<string>('');
   const [provider, setProvider] = useState<'efi' | 'static'>('efi');
+  const [verifyError, setVerifyError] = useState<string | null>(null);
 
   // Parâmetros do cálculo dinâmico de dias (baseado no período de teste de 3 dias / 72h)
   const currentDays = (() => {
@@ -190,15 +192,40 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setTimeout(() => setCopiedPix(false), 2500);
   };
 
-  const handleConfirmPix = () => {
+  const handleConfirmPix = async () => {
+    if (isVerifying) return;
     setIsVerifying(true);
-    setTimeout(() => {
-      setIsVerifying(false);
-      setCurrentStep('success');
-      if (onPaymentSuccess && instance) {
-        onPaymentSuccess(instance.id, 'Renovação 30 dias');
+    setVerifyError(null);
+
+    try {
+      if (!txid) {
+        setVerifyError('Aguardando identificação da cobrança Pix. Aguarde alguns instantes e tente novamente.');
+        setIsVerifying(false);
+        return;
       }
-    }, 1800);
+
+      // Consulta real na Efí / Hub de pagamentos
+      const res = await fetch(`${workerUrl}/api/payments/pix/status/${encodeURIComponent(txid)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.isPaid || data.status === 'CONCLUIDA' || data.status === 'PAID') {
+          setCurrentStep('success');
+          if (onPaymentSuccess && instance) {
+            onPaymentSuccess(instance.id, currentPlan.name);
+          }
+          return;
+        } else {
+          setVerifyError('Pagamento ainda não identificado pela instituição bancária. Se você acabou de pagar pelo app do seu banco, aguarde cerca de 10 a 20 segundos e tente clicar novamente.');
+        }
+      } else {
+        setVerifyError('Não foi possível verificar a compensação no momento. Tente novamente em instantes.');
+      }
+    } catch (err) {
+      console.error('Erro ao verificar status do Pix:', err);
+      setVerifyError('Erro de conexão ao verificar pagamento bancário. Verifique sua conexão e tente novamente.');
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   // Resetar ao fechar ou reabrir
@@ -209,6 +236,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setDynamicPixCode('');
       setDynamicQrCodeUrl('');
       setTxid('');
+      setVerifyError(null);
     }
   }, [isOpen]);
 
@@ -506,6 +534,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* Mensagem de Aviso se não estiver compensado */}
+            {verifyError && (
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5 animate-fadeIn">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400 mt-0.5" />
+                <span className="leading-relaxed">{verifyError}</span>
+              </div>
+            )}
 
             {/* Botão de Confirmação */}
             <button
