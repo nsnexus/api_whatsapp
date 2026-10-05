@@ -45,14 +45,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [txid, setTxid] = useState<string>('');
   const [provider, setProvider] = useState<'efi' | 'static'>('efi');
 
-  // Parâmetros do cálculo de dias
-  const currentDays = 10;
+  // Parâmetros do cálculo dinâmico de dias (baseado no período de teste de 3 dias / 72h)
+  const currentDays = (() => {
+    if (instance?.created_at) {
+      const hoursOld = (Date.now() - new Date(instance.created_at).getTime()) / (1000 * 60 * 60);
+      return Math.max(0, Math.ceil((72 - hoursOld) / 24));
+    }
+    return 0;
+  })();
   const renewalDays = 30;
   const totalDays = currentDays + renewalDays;
 
-  const instanceCode = instance?.instance_name 
-    ? (instance.instance_name.startsWith('org_') ? 'WHATSAPP-34O7BP-59EWJO' : instance.instance_name)
-    : 'WHATSAPP-34O7BP-59EWJO';
+  const instanceCode = instance?.name || instance?.instance_name || 'WHATSAPP-34O7BP-59EWJO';
 
   const [selectedPlanId, setSelectedPlanId] = useState<string>(() => {
     if (selectedPlan?.includes('10')) return '10_instancias';
@@ -304,18 +308,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
               {/* Rótulos Superiores */}
               <div className="flex justify-between items-center text-[12px] px-3 font-semibold">
-                <span className="text-slate-300">Tempo atual: <strong className="text-blue-400">10d</strong></span>
-                <span className="text-emerald-400 font-bold">Renovação: +30d</span>
+                <span className="text-slate-300">Tempo atual: <strong className="text-blue-400">{currentDays}d</strong></span>
+                <span className="text-emerald-400 font-bold">Renovação: +{renewalDays}d</span>
               </div>
 
-              {/* Barra Visual com os Círculos (10d -> 40d) */}
+              {/* Barra Visual com os Círculos ({currentDays}d -> {totalDays}d) */}
               <div className="relative flex items-center justify-between px-6 py-2">
                 <div className="absolute left-10 right-10 h-[2px] bg-slate-700/80 z-0">
                   <div className="h-full bg-gradient-to-r from-blue-500 via-emerald-500 to-emerald-400" style={{ width: '100%' }} />
                 </div>
 
                 <div className="relative z-10 w-9 h-9 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-lg shadow-blue-500/40 ring-4 ring-[#141926]">
-                  10d
+                  {currentDays}d
                 </div>
 
                 <div className="relative z-10 w-7 h-7 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-md shadow-emerald-500/30 ring-4 ring-[#141926]">
@@ -323,7 +327,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
 
                 <div className="relative z-10 w-11 h-11 rounded-full bg-emerald-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-xl shadow-emerald-500/50 ring-4 ring-[#141926]">
-                  40d
+                  {totalDays}d
                 </div>
               </div>
 
